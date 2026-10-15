@@ -29,7 +29,7 @@
       background: #000;
     }
     #receiver-square {
-      width: min(94vmin, 720px);
+      width: min(100vh, 100vh);
       aspect-ratio: 1;
       display: flex;
       flex-direction: column;
@@ -45,15 +45,17 @@
     }
     #launchpad-panel {
       background: #1a1a1a;
+      justify-items: center;
     }
     #matrix {
       display: grid;
       grid-template-columns: repeat(9, minmax(0, 1fr));
       grid-template-rows: repeat(9, minmax(0, 1fr));
-      width: 100%;
+      width: 50%;
       height: 100%;
       border-top: 1px solid #f46404;
       border-left: 1px solid #f46404;
+      margin: 0 auto;
     }
     .pad,
     .spacer {
@@ -179,7 +181,7 @@
     // Adjust letter spacing and transition behavior here.
     const CONFIG = {
       letterCount: 9,
-      letterGap: -100,
+      letterGap: -150,
       minFontWidth: 100,
       maxFontWidth: 500,
       fontSizeSafetyScale: 1,
