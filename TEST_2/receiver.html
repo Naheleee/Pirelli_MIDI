@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Receiver</title>
+    <style>
+      .box {
+        width: 100px;
+        height: 100px;
+        background: black;
+        margin-bottom: 5px;
+        transition:
+          width 0.1s,
+          height 0.1s;
+      }
+    </style>
+  </head>
+  <body>
+    <div>Sender 1</div>
+    <div id="box1" class="box"></div>
+    <div id="info1">Waiting for phone...</div>
+    <div>Sender 2</div>
+    <div id="box2" class="box"></div>
+    <div id="info2">Waiting for phone...</div>
+
+    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+    <script>
+      var API_KEY = "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0";
+      var client = new Ably.Realtime(API_KEY);
+
+      function connectBox(channelName, boxId, infoId) {
+        var channel = client.channels.get(channelName);
+        var box = document.getElementById(boxId);
+        var info = document.getElementById(infoId);
+
+        channel.subscribe("pinch", function (msg) {
+          var distance = msg.data.distance;
+
+          info.textContent = "distance: " + distance + "px";
+
+          // map distance (0-400) to box size (50-400)
+          var size = map(distance, 0, 400, 50, 400);
+          box.style.width = size + "px";
+          box.style.height = size + "px";
+        });
+      }
+
+      connectBox("pinch", "box1", "info1");
+      connectBox("pinch2", "box2", "info2");
+
+      function map(value, inMin, inMax, outMin, outMax) {
+        return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
+      }
+    </script>
+  </body>
+</html>
