@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+  <head>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="viewport" content="width=device-width" />
+    <title>Sender</title>
+    <style>
+      body {
+        text-align: center;
+      }
+      #touch-area {
+        margin-top: 40px;
+        width: 100%;
+        height: 300px;
+        background: #eee;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #888;
+      }
+      #distance {
+        margin-top: 20px;
+        color: black;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="touch-area">pinch here with two fingers</div>
+    <div id="distance"></div>
+
+    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+    <script>
+      var API_KEY = "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0";
+      var client = new Ably.Realtime(API_KEY);
+      var channel = client.channels.get("pinch2");
+
+      var distanceEl = document.getElementById("distance");
+      var touchArea = document.getElementById("touch-area");
+
+      touchArea.addEventListener(
+        "touchmove",
+        function (e) {
+          e.preventDefault();
+
+          // need exactly 2 fingers
+          if (e.touches.length < 2) return;
+
+          var t1 = e.touches[0];
+          var t2 = e.touches[1];
+
+          // distance between two fingers
+          var dx = t2.clientX - t1.clientX;
+          var dy = t2.clientY - t1.clientY;
+          var distance = Math.round(Math.sqrt(dx * dx + dy * dy));
+
+          distanceEl.textContent = distance + "px";
+
+          // send to receiver
+          channel.publish("pinch", { distance: distance });
+        },
+        { passive: false },
+      );
+    </script>
+  </body>
+</html>
