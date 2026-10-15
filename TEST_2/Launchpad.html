@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Launchpad Matrix</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #aaa;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            display: grid;
+            place-items: center;
+            background: #1a1a1a;
+        }
+
+        main {
+            width: min(94vmin, 720px);
+            aspect-ratio: 1;
+        }
+
+        #connect {
+            position: fixed;
+            right: 16px;
+            bottom: 16px;
+            z-index: 2;
+            min-width: 42px;
+            min-height: 42px;
+            padding: 8px;
+            border: 1px solid #f46404;
+            border-radius: 0;
+            background: #1a1a1a;
+            color: #f46404;
+            cursor: pointer;
+        }
+
+        #connect:hover {
+            background: #2a2a2a;
+        }
+
+        #matrix {
+            display: grid;
+            grid-template-columns: repeat(9, minmax(0, 1fr));
+            grid-template-rows: repeat(9, minmax(0, 1fr));
+            gap: 0;
+            width: 100%;
+            height: 100%;
+            border-top: 1px solid #f46404;
+            border-left: 1px solid #f46404;
+        }
+
+        .pad {
+            min-width: 0;
+            min-height: 0;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            border-right: 1px solid #f46404;
+            border-bottom: 1px solid #f46404;
+            border-radius: 0;
+            background: #1a1a1a;
+            color: #777;
+            cursor: pointer;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .pad.spacer {
+            pointer-events: none;
+        }
+
+        .spacer {
+            border-right: 1px solid #f46404;
+            border-bottom: 1px solid #f46404;
+        }
+
+
+        .pad {
+            position: relative;
+        }
+
+        .pad.active {
+            background: #f4640438;
+        }
+
+        .pad.active::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 20%;
+            aspect-ratio: 1;
+            border-radius: 50%;
+           background: #f46404;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <div id="matrix" aria-label="Launchpad pad matrix"></div>
+    </main>
+    <button id="connect" type="button" aria-label="Connect Launchpad" title="Connect Launchpad">Connect</button>
+
+    <script>
+        const ORANGE_LED = 9;
+        const rows = [{
+                base: 81,
+                scene: 89
+            },
+            {
+                base: 71,
+                scene: 79
+            },
+            {
+                base: 61,
+                scene: 69
+            },
+            {
+                base: 51,
+                scene: 59
+            },
+            {
+                base: 41,
+                scene: 49
+            },
+            {
+                base: 31,
+                scene: 39
+            },
+            {
+                base: 21,
+                scene: 29
+            },
+            {
+                base: 11,
+                scene: 19
+            }
+        ];
+        const pads = new Map();
+        const pressedPads = new Set();
+        let midiAccess = null;
+        let midiInput = null;
+        let midiOutput = null;
+        const matrix = document.getElementById('matrix');
+        const status = document.getElementById('status');
+
+        function createPad(id) {
+            const pad = document.createElement('button');
+            pad.type = 'button';
+            pad.className = 'pad';
+            pad.setAttribute('aria-label', `Launchpad button ${id}`);
+            pad.title = `Button ${id}`;
+            pad.addEventListener('pointerdown', event => {
+                if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+                event.preventDefault();
+                pad.setPointerCapture(event.pointerId);
+                pressPad(id);
+            });
+            pad.addEventListener('pointerup', () => releasePad(id));
+            pad.addEventListener('pointercancel', () => releasePad(id));
+            pad.addEventListener('lostpointercapture', () => releasePad(id));
+            pads.set(id, pad);
+            matrix.appendChild(pad);
+        }
+
+        function createSpacer() {
+            const spacer = document.createElement('div');
+            spacer.className = 'spacer';
+            spacer.setAttribute('aria-hidden', 'true');
+            matrix.appendChild(spacer);
+        }
+
+        for (let id = 91; id <= 98; id++) createPad(id);
+        createSpacer();
+        for (const row of rows) {
+            for (let column = 0; column < 8; column++) createPad(row.base + column);
+            createPad(row.scene);
+        }
+
+        function midiMessage(id, velocity) {
+            if (id >= 91 && id <= 98) return [0xb0, id + 13, velocity];
+            return [0x90, id, velocity];
+        }
+
+        function sendLed(id, velocity) {
+            if (!midiOutput) return;
+            try {
+                midiOutput.send(midiMessage(id, velocity));
+            } catch (error) {
+                document.getElementById('connect').title = `MIDI output error: ${error.message}`;
+            }
+        }
+
+        function pressPad(id) {
+            if (pressedPads.has(id)) return;
+            pressedPads.add(id);
+            pads.get(id)?.classList.add('active');
+            sendLed(id, ORANGE_LED);
+        }
+
+        function releasePad(id) {
+            if (!pressedPads.delete(id)) return;
+            pads.get(id)?.classList.remove('active');
+            sendLed(id, 0);
+        }
+
+        function handleMidiMessage(event) {
+            const [statusByte, number, velocity] = event.data;
+            const command = statusByte & 0xf0;
+            let id;
+            let isDown;
+
+            if (command === 0x90 || command === 0x80) {
+                id = number;
+                isDown = command === 0x90 && velocity > 0;
+            } else if (command === 0xb0 && number >= 104 && number <= 111) {
+                id = number - 13;
+                isDown = velocity > 0;
+            } else {
+                return;
+            }
+
+            if (!pads.has(id)) return;
+            if (isDown) {
+                pressPad(id);
+            } else {
+                releasePad(id);
+            }
+        }
+
+        async function toggleLaunchpadConnection() {
+            const connectButton = document.getElementById('connect');
+            if (midiInput || midiOutput) {
+                if (midiInput) midiInput.onmidimessage = null;
+                midiInput = null;
+                midiOutput = null;
+                connectButton.textContent = 'Connect';
+                connectButton.title = 'Connect Launchpad';
+                return;
+            }
+
+            if (!navigator.requestMIDIAccess) {
+                connectButton.title = 'Web MIDI is not supported by this browser.';
+                return;
+            }
+
+            try {
+                midiAccess = await navigator.requestMIDIAccess();
+                midiAccess.onstatechange = updateMidiPorts;
+                updateMidiPorts();
+            } catch (error) {
+                connectButton.title = `MIDI connection failed: ${error.message}`;
+            }
+        }
+
+        function updateMidiPorts() {
+            const inputs = [...midiAccess.inputs.values()];
+            const outputs = [...midiAccess.outputs.values()];
+            const isLaunchpad = port => /launchpad|novation|\blp\b/i.test(port.name);
+            midiInput = inputs.find(isLaunchpad) || inputs[0] || null;
+            midiOutput = outputs.find(isLaunchpad) || outputs[0] || null;
+
+            if (midiInput) midiInput.onmidimessage = handleMidiMessage;
+            if (!midiInput && !midiOutput) {
+                document.getElementById('connect').textContent = 'Connect';
+                document.getElementById('connect').title =
+                'No MIDI device found. Connect your Launchpad and try again.';
+            } else {
+                const name = midiInput?.name || midiOutput?.name || 'MIDI device';
+                document.getElementById('connect').textContent = 'On';
+                document.getElementById('connect').title = `Connected: ${name}`;
+            }
+        }
+
+        document.getElementById('connect').addEventListener('click', toggleLaunchpadConnection);
+    </script>
+</body>
+
+</html>

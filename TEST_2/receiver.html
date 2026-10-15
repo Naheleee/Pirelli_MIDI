@@ -1,55 +1,490 @@
-<!doctype html>
-<html>
-  <head>
-    <title>Receiver</title>
-    <style>
-      .box {
-        width: 100px;
-        height: 100px;
-        background: black;
-        margin-bottom: 5px;
-        transition:
-          width 0.1s,
-          height 0.1s;
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Launchpad + Keyboard Receiver</title>
+  <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+  <style>
+    @font-face {
+      font-family: PirelliVar;
+      src: url('PirelliVar.woff2') format('woff2-variations'),
+           url('PirelliVar.ttf') format('truetype-variations');
+      font-stretch: 100% 500%;
+    }
+    @font-face {
+      font-family: PirelliStencil;
+      src: url('PirelliStencil.woff2') format('woff2');
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background: #000;
+    }
+    #receiver-square {
+      width: min(94vmin, 720px);
+      aspect-ratio: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #launchpad-panel,
+    #keyboard-panel {
+      position: relative;
+      width: 100%;
+      height: 50%;
+      min-height: 0;
+      overflow: hidden;
+    }
+    #launchpad-panel {
+      background: #1a1a1a;
+    }
+    #matrix {
+      display: grid;
+      grid-template-columns: repeat(9, minmax(0, 1fr));
+      grid-template-rows: repeat(9, minmax(0, 1fr));
+      width: 100%;
+      height: 100%;
+      border-top: 1px solid #f46404;
+      border-left: 1px solid #f46404;
+    }
+    .pad,
+    .spacer {
+      min-width: 0;
+      min-height: 0;
+      border-right: 1px solid #f46404;
+      border-bottom: 1px solid #f46404;
+    }
+    .pad {
+      position: relative;
+      margin: 0;
+      padding: 0;
+      border-top: 0;
+      border-left: 0;
+      border-radius: 0;
+      background: #1a1a1a;
+      color: #777;
+    }
+    .pad.active {
+      background: #f4640438;
+    }
+    .pad.active::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 20%;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      background: #f46404;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+    }
+    #square {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      background: #F46404;
+    }
+    #wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      color: #1A1A1A;
+      font-family: PirelliVar;
+      white-space: nowrap;
+    }
+    #wrapper span {
+      display: inline-block;
+      flex: 0 0 auto;
+      margin: 0;
+      text-align: center;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <main id="receiver-square">
+    <section id="launchpad-panel" aria-label="Launchpad">
+      <div id="matrix" aria-label="Launchpad pad matrix"></div>
+    </section>
+    <section id="keyboard-panel" aria-label="Keyboard">
+      <div id="square">
+        <div id="wrapper"></div>
+      </div>
+    </section>
+  </main>
+  <script>
+    const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
+    (() => {
+      const rows = [
+        { base: 81, scene: 89 },
+        { base: 71, scene: 79 },
+        { base: 61, scene: 69 },
+        { base: 51, scene: 59 },
+        { base: 41, scene: 49 },
+        { base: 31, scene: 39 },
+        { base: 21, scene: 29 },
+        { base: 11, scene: 19 }
+      ];
+      const pads = new Map();
+      const matrix = document.getElementById('matrix');
+
+      function createPad(id) {
+        const pad = document.createElement('div');
+        pad.className = 'pad';
+        pad.setAttribute('aria-label', `Launchpad button ${id}`);
+        pads.set(id, pad);
+        matrix.appendChild(pad);
       }
-    </style>
-  </head>
-  <body>
-    <div>Sender 1</div>
-    <div id="box1" class="box"></div>
-    <div id="info1">Waiting for phone...</div>
-    <div>Sender 2</div>
-    <div id="box2" class="box"></div>
-    <div id="info2">Waiting for phone...</div>
 
-    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
-    <script>
-      var API_KEY = "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0";
-      var client = new Ably.Realtime(API_KEY);
+      function createSpacer() {
+        const spacer = document.createElement('div');
+        spacer.className = 'spacer';
+        spacer.setAttribute('aria-hidden', 'true');
+        matrix.appendChild(spacer);
+      }
 
-      function connectBox(channelName, boxId, infoId) {
-        var channel = client.channels.get(channelName);
-        var box = document.getElementById(boxId);
-        var info = document.getElementById(infoId);
+      for (let id = 91; id <= 98; id++) createPad(id);
+      createSpacer();
+      for (const row of rows) {
+        for (let column = 0; column < 8; column++) createPad(row.base + column);
+        createPad(row.scene);
+      }
 
-        channel.subscribe("pinch", function (msg) {
-          var distance = msg.data.distance;
+      window.receiveLaunchpadMidi = data => {
+        if (!data || !Number.isInteger(data.id) || typeof data.isDown !== 'boolean') return;
+        const pad = pads.get(data.id);
+        if (!pad) return;
+        pad.classList.toggle('active', data.isDown);
+      };
+      ablyClient.channels.get('launchpad').subscribe('midi', message => {
+        window.receiveLaunchpadMidi(message.data);
+      });
+    })();
+  </script>
+  <script>
+    const square = document.getElementById('square');
+    const wrapper = document.getElementById('wrapper');
+    // Adjust letter spacing and transition behavior here.
+    const CONFIG = {
+      letterCount: 9,
+      letterGap: -100,
+      minFontWidth: 100,
+      maxFontWidth: 500,
+      fontSizeSafetyScale: 1,
+      midiFirstNote: 36,
+      midiLastNote: 96,
+      transitionDurationMs: 620,
+      animationVelocity: 1,
+      minAnimationVelocity: 0.1,
+      maxAnimationVelocity: 5,
+      transitionType: 'cubic',
+      elasticBounceStrength: 0.5
+    };
+    const count = CONFIG.letterCount;
+    let effectiveGap = CONFIG.letterGap;
+    const easingFunctions = {
+      linear: progress => progress,
+      cubic: progress =>
+        1 - (1 - progress) ** 3,
+      elastic: progress => {
+        if (progress === 0 || progress === 1) return progress;
+        return 2 ** (-10 * progress) *
+          Math.sin((progress * 10 - 0.75) * (2 * Math.PI / 3)) + 1;
+      },
+      softElastic: progress => {
+        if (progress === 0 || progress === 1) return progress;
+        const smoothProgress =
+          progress < 0.5
+            ? 4 * progress ** 3
+            : 1 - (-2 * progress + 2) ** 3 / 2;
+        const elasticProgress = progress < 0.5
+          ? -(
+              2 ** (20 * progress - 10) *
+              Math.sin((20 * progress - 11.125) * (2 * Math.PI / 4.5))
+            ) / 2
+          : (
+              2 ** (-20 * progress + 10) *
+              Math.sin((20 * progress - 11.125) * (2 * Math.PI / 4.5))
+            ) / 2 + 1;
+        return smoothProgress +
+          (elasticProgress - smoothProgress) *
+            CONFIG.elasticBounceStrength;
+      }
+    };
+    const spans = Array.from({ length: count }, () => {
+      const span = document.createElement('span');
+      span.textContent = 'A';
+      span.style.fontVariationSettings =
+        `'wdth' ${CONFIG.minFontWidth}`;
+      wrapper.appendChild(span);
+      return span;
+    });
 
-          info.textContent = "distance: " + distance + "px";
+    function getWaveWidths(crest) {
+      return spans.map((_, index) => {
+        if (index === crest) return CONFIG.maxFontWidth;
 
-          // map distance (0-400) to box size (50-400)
-          var size = map(distance, 0, 400, 50, 400);
-          box.style.width = size + "px";
-          box.style.height = size + "px";
+        const distanceToEdge = index < crest
+          ? crest
+          : count - 1 - crest;
+        const distanceFromCrest = Math.abs(index - crest);
+        const widthRange =
+          CONFIG.maxFontWidth - CONFIG.minFontWidth;
+
+        return CONFIG.maxFontWidth -
+          widthRange * distanceFromCrest / distanceToEdge;
+      });
+    }
+
+    function getFittedFontSize(widths, fontFamily) {
+      const size = square.clientWidth;
+      const height = square.clientHeight;
+      if (!size || !height) return 0;
+
+      const previousFontSize = wrapper.style.fontSize;
+      const previousFontFamily = wrapper.style.fontFamily;
+      const previousWidths = spans.map(
+        span => span.style.fontVariationSettings
+      );
+      wrapper.style.fontFamily = `"${fontFamily}"`;
+      spans.forEach((span, index) => {
+        span.style.fontVariationSettings = `'wdth' ${widths[index]}`;
+      });
+
+      let low = 1;
+      let high = height * 4;
+      for (let i = 0; i < 30; i++) {
+        const mid = (low + high) / 2;
+        wrapper.style.fontSize = `${mid}px`;
+        const lettersWidth = spans.reduce(
+          (total, span) => total + span.getBoundingClientRect().width,
+          0
+        ) + effectiveGap * (count - 1);
+        const lettersHeight = Math.max(
+          ...spans.map(span => span.getBoundingClientRect().height)
+        );
+        if (
+          lettersWidth <= size &&
+          lettersHeight <= height
+        ) {
+          low = mid;
+        } else {
+          high = mid;
+        }
+      }
+      wrapper.style.fontSize = previousFontSize;
+      wrapper.style.fontFamily = previousFontFamily;
+      spans.forEach((span, index) => {
+        span.style.fontVariationSettings = previousWidths[index];
+      });
+      return low * CONFIG.fontSizeSafetyScale;
+    }
+
+    function fitText() {
+      wrapper.style.width = '100%';
+      effectiveGap = CONFIG.letterGap;
+      wrapper.style.columnGap = '0px';
+      spans.forEach((span, index) => {
+        span.style.marginLeft =
+          index === 0 ? '0px' : `${effectiveGap}px`;
+        span.style.fontVariationSettings =
+          `'wdth' ${CONFIG.minFontWidth}`;
+      });
+      let fittedFontSize = Infinity;
+      for (const fontFamily of ['PirelliVar', 'PirelliStencil']) {
+        for (let center = 0; center < count; center++) {
+          fittedFontSize = Math.min(
+            fittedFontSize,
+            getFittedFontSize(
+              getWaveWidths(center),
+              fontFamily
+            )
+          );
+        }
+      }
+      wrapper.style.fontSize = `${fittedFontSize}px`;
+    }
+
+    let stencilActive = false;
+    let fontSwitchRequest = 0;
+
+    window.addEventListener('keydown', event => {
+      if (event.code !== 'Space' || event.repeat) return;
+      event.preventDefault();
+
+      stencilActive = !stencilActive;
+      const fontFamily = stencilActive
+        ? 'PirelliStencil'
+        : 'PirelliVar';
+      const request = ++fontSwitchRequest;
+
+      document.fonts.load(`16px "${fontFamily}"`)
+        .then(() => {
+          if (request !== fontSwitchRequest) return;
+          wrapper.style.fontFamily = `"${fontFamily}"`;
+        })
+        .catch(error => {
+          console.error(
+            `Failed to load ${fontFamily}:`,
+            error
+          );
+        });
+    });
+
+    Promise.all([
+      document.fonts.load('16px "PirelliVar"', 'A'),
+      document.fonts.load('16px "PirelliStencil"', 'A')
+    ]).then(() => {
+      fitText();
+      spans.forEach(span => {
+        span.style.fontVariationSettings =
+          `'wdth' ${CONFIG.minFontWidth}`;
+      });
+      window.dispatchEvent(new Event('staticlettersready'));
+    });
+
+    window.addEventListener('resize', () => {
+      fitText();
+      window.dispatchEvent(new Event('staticlettersready'));
+    });
+  </script>
+  <script>
+    (() => {
+      const firstMidiNote = CONFIG.midiFirstNote;
+      const lastMidiNote = CONFIG.midiLastNote;
+      const totalGroups = CONFIG.letterCount;
+      const totalMidiNotes = lastMidiNote - firstMidiNote + 1;
+      const groupLetters = Array.from(
+        document.querySelectorAll('#wrapper span')
+      );
+      let selectedGroup = null;
+      let lettersReady = false;
+      let midiInitialized = false;
+      let pendingMidiNote = null;
+      let animationFrame = null;
+      let animationStart = 0;
+      let animationFrom = groupLetters.map(
+        () => CONFIG.minFontWidth
+      );
+      let animationTo = animationFrom.slice();
+      const easing = easingFunctions[CONFIG.transitionType];
+      if (!easing) {
+        throw new Error(
+          `Unknown transition type: ${CONFIG.transitionType}`
+        );
+      }
+
+      function getGroupIndex(midi) {
+        return Math.ceil(
+          (midi - firstMidiNote + 1) * totalGroups / totalMidiNotes
+        ) - 1;
+      }
+
+      function showSelectedGroup() {
+        if (!lettersReady) return;
+        const targetWidths = selectedGroup === null
+          ? groupLetters.map(() => CONFIG.minFontWidth)
+          : getWaveWidths(selectedGroup);
+        animateTo(targetWidths);
+      }
+
+      function applyWidths(widths) {
+        groupLetters.forEach((span, index) => {
+          span.style.fontVariationSettings = `'wdth' ${
+            Math.max(
+              CONFIG.minFontWidth,
+              Math.min(CONFIG.maxFontWidth, widths[index])
+            )
+          }`;
         });
       }
 
-      connectBox("pinch", "box1", "info1");
-      connectBox("pinch2", "box2", "info2");
-
-      function map(value, inMin, inMax, outMin, outMax) {
-        return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
+      function animateTo(targetWidths) {
+        if (animationFrame !== null) {
+          cancelAnimationFrame(animationFrame);
+        }
+        animationFrom = groupLetters.map(span => {
+          const match = getComputedStyle(span)
+            .fontVariationSettings.match(/[\d.]+/);
+          return match ? Number(match[0]) : CONFIG.minFontWidth;
+        });
+        animationTo = targetWidths;
+        animationStart = 0;
+        animationFrame = requestAnimationFrame(animateFrame);
       }
-    </script>
-  </body>
+
+      function animateFrame(time) {
+        if (animationStart === 0) animationStart = time;
+        const velocity = Math.max(
+          CONFIG.minAnimationVelocity,
+          Math.min(
+            CONFIG.maxAnimationVelocity,
+            CONFIG.animationVelocity
+          )
+        );
+        const duration = Math.max(
+          1,
+          CONFIG.transitionDurationMs / velocity
+        );
+        const progress = Math.min(1, (time - animationStart) / duration);
+        const easedProgress = easing(progress);
+        const widths = animationFrom.map((start, index) =>
+          start + (animationTo[index] - start) * easedProgress
+        );
+        applyWidths(widths);
+
+        if (progress < 1) {
+          animationFrame = requestAnimationFrame(animateFrame);
+        } else {
+          animationFrame = null;
+          applyWidths(animationTo);
+        }
+      }
+
+      function pressMidiNote(midi) {
+        if (midi < firstMidiNote || midi > lastMidiNote) return;
+        if (!lettersReady) {
+          pendingMidiNote = midi;
+          return;
+        }
+        selectedGroup = getGroupIndex(midi);
+        showSelectedGroup();
+      }
+
+      ablyClient.channels.get('keyboard').subscribe('midi', message => {
+        const data = message.data;
+        if (data && data.type === 'noteon' && Number.isInteger(data.note)) {
+          pressMidiNote(data.note);
+        }
+      });
+
+      window.addEventListener('staticlettersready', () => {
+        lettersReady = true;
+        if (!midiInitialized) {
+          selectedGroup = totalGroups - 1;
+          applyWidths(getWaveWidths(selectedGroup));
+          midiInitialized = true;
+          if (pendingMidiNote !== null) {
+            pressMidiNote(pendingMidiNote);
+            pendingMidiNote = null;
+          }
+          return;
+        }
+        showSelectedGroup();
+      });
+    })();
+  </script>
+</body>
 </html>
