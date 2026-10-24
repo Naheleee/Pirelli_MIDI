@@ -375,7 +375,11 @@
         connectedMidiInputs.add(input);
 
         input.addListener('noteon', event => {
-          pressMidiNote(event.note.number);
+          if (event.velocity === 0) {
+            releaseMidiNote(event.note.number);
+          } else {
+            pressMidiNote(event.note.number);
+          }
         });
         input.addListener('noteoff', event => {
           releaseMidiNote(event.note.number);
@@ -386,6 +390,9 @@
         try {
           await WebMidi.enable();
           const input =
+            WebMidi.inputs.find(device =>
+              /launchkey|novation/i.test(device.name)
+            ) ||
             WebMidi.inputs.find(device =>
               device.name.toLowerCase().includes('bk-3')
             ) ||
