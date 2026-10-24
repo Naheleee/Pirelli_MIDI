@@ -71,7 +71,7 @@
       maxFontWidth: 500,
       fontSizeSafetyScale: 1,
       midiFirstNote: 36,
-      midiLastNote: 96,
+      midiLastNote: 65,
       transitionDurationMs: 620,
       animationVelocity: 1,
       minAnimationVelocity: 0.1,
@@ -256,7 +256,7 @@
       const firstMidiNote = CONFIG.midiFirstNote;
       const lastMidiNote = CONFIG.midiLastNote;
       const totalGroups = CONFIG.letterCount;
-      const totalMidiNotes = lastMidiNote - firstMidiNote + 1;
+      const whitePitchClasses = new Set([0, 2, 4, 5, 7, 9, 11]);
       const groupLetters = Array.from(
         document.querySelectorAll('#wrapper span')
       );
@@ -277,9 +277,11 @@
       }
 
       function getGroupIndex(midi) {
-        return Math.ceil(
-          (midi - firstMidiNote + 1) * totalGroups / totalMidiNotes
-        ) - 1;
+        let whiteKeysBefore = 0;
+        for (let note = firstMidiNote; note < midi; note++) {
+          if (whitePitchClasses.has(note % 12)) whiteKeysBefore++;
+        }
+        return Math.floor(whiteKeysBefore / 2);
       }
 
       function showSelectedGroup() {
@@ -347,13 +349,23 @@
         if (
           !lettersReady ||
           midi < firstMidiNote ||
-          midi > lastMidiNote
+          midi > lastMidiNote ||
+          !whitePitchClasses.has(midi % 12)
         ){
           return;
         }
         selectedGroup = getGroupIndex(midi);
         showSelectedGroup();
         midiChannel.publish('midi', { type: 'noteon', note: midi });
+      }
+
+      function releaseMidiNote(midi) {
+        if (
+          midi < firstMidiNote ||
+          midi > lastMidiNote ||
+          !whitePitchClasses.has(midi % 12)
+        ) return;
+        midiChannel.publish('midi', { type: 'noteoff', note: midi });
       }
 
       const connectedMidiInputs = new WeakSet();
@@ -364,6 +376,9 @@
 
         input.addListener('noteon', event => {
           pressMidiNote(event.note.number);
+        });
+        input.addListener('noteoff', event => {
+          releaseMidiNote(event.note.number);
         });
       }
 

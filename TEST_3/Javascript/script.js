@@ -38,10 +38,17 @@ const CONFIG = {
     minFontWidth: 100,
     maxFontWidth: 500,
     midiFirstNote: 36,
-    midiLastNote: 96,
+    midiLastNote: 65,
     transitionDurationMs: 620
 };
 const count = CONFIG.letterCount;
+const visualizerBottom = document.querySelector('.audio-visualizer-bottom');
+const visualizerSegments = Array.from({ length: count }, () => {
+    const segment = document.createElement('div');
+    segment.className = 'audio-visualizer-segment';
+    visualizerBottom.appendChild(segment);
+    return segment;
+});
 const spans = Array.from({ length: count }, () => {
     const span = document.createElement('span');
     span.className = 'lettera-singola';
@@ -109,6 +116,9 @@ function fitText() {
 }
 
 let selectedGroup = count - 1;
+let lettersReady = false;
+let pendingMidiNote = null;
+let activeMidiNote = null;
 let animationFrame = null;
 let animationStart = 0;
 let animationFrom = spans.map(() => CONFIG.minFontWidth);
@@ -129,10 +139,31 @@ function animateFrame(time) {
     else animationFrame = null;
 }
 
-function selectNote(note) {
-    if (!Number.isInteger(note) || note < CONFIG.midiFirstNote || note > CONFIG.midiLastNote) return;
-    selectedGroup = Math.ceil((note - CONFIG.midiFirstNote + 1) * count /
-        (CONFIG.midiLastNote - CONFIG.midiFirstNote + 1)) - 1;
+const whitePitchClasses = new Set([0, 2, 4, 5, 7, 9, 11]);
+
+function isSelectableNote(note) {
+    return Number.isInteger(note) &&
+        note >= CONFIG.midiFirstNote &&
+        note <= CONFIG.midiLastNote &&
+        whitePitchClasses.has(note % 12);
+}
+
+function getGroupIndex(note) {
+    let whiteKeysBefore = 0;
+    for (let midi = CONFIG.midiFirstNote; midi < note; midi++) {
+        if (whitePitchClasses.has(midi % 12)) whiteKeysBefore++;
+    }
+    return Math.floor(whiteKeysBefore / 2);
+}
+
+function setActiveSegment(group) {
+    visualizerSegments.forEach((segment, index) => {
+        segment.classList.toggle('active', index === group);
+    });
+}
+
+function animateGroup(group) {
+    selectedGroup = group;
     if (animationFrame !== null) cancelAnimationFrame(animationFrame);
     animationFrom = spans.map(span => {
         const match = getComputedStyle(span).fontVariationSettings.match(/[\d.]+/);
@@ -143,18 +174,42 @@ function selectNote(note) {
     animationFrame = requestAnimationFrame(animateFrame);
 }
 
+function selectNote(note) {
+    if (!isSelectableNote(note)) return;
+    activeMidiNote = note;
+    const group = getGroupIndex(note);
+    setActiveSegment(group);
+    if (!lettersReady) {
+        pendingMidiNote = note;
+        return;
+    }
+    animateGroup(group);
+}
+
+function releaseNote(note) {
+    if (!isSelectableNote(note) || activeMidiNote !== note) return;
+    activeMidiNote = null;
+    pendingMidiNote = null;
+    setActiveSegment(null);
+}
+
 Promise.all([
     document.fonts.load('16px "PirelliVar"', 'A'),
     document.fonts.load('16px "PirelliStencil"', 'A')
 ]).then(() => {
     fitText();
-    applyWidths(animationTo);
+    lettersReady = true;
+    if (pendingMidiNote !== null && activeMidiNote === pendingMidiNote) {
+        animateGroup(getGroupIndex(pendingMidiNote));
+    } else applyWidths(animationTo);
+    pendingMidiNote = null;
 });
 window.addEventListener('resize', fitText);
 let fontChangeRequest = 0;
 ablyClient.channels.get('keyboard').subscribe('midi', message => {
     const data = message.data;
     if (data?.type === 'noteon') selectNote(data.note);
+    if (data?.type === 'noteoff') releaseNote(data.note);
     if (
         data?.type === 'fontchange' &&
         ['PirelliVar', 'PirelliStencil'].includes(data.fontFamily)
