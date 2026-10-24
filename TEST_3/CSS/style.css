@@ -308,12 +308,24 @@ p {
 
 .audio-visualizer-segment {
     min-width: 0;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 10px;
     border-right: 1px solid #1A1A1A;
+    color: #1A1A1A;
+    font-size: 10px;
+    font-variation-settings: "wdth" 500;
+    line-height: 1.1;
+    text-align: center;
+    white-space: pre-line;
+    overflow: hidden;
 }
 
 .audio-visualizer-segment.active {
     border-top: 1px solid #F46404;
     background-color: #1A1A1A;
+    color: #F46404;
 }
 
 .square2 {

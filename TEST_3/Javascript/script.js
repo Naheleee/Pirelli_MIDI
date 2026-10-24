@@ -1,16 +1,16 @@
 const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
 const messageOutput = document.querySelector('.font-info2');
+const styleStatus = document.querySelector('.style-status');
 
 function prependKeyMessage(message) {
-    const formattedMessage = `"${message}"`;
     messageOutput.textContent = messageOutput.textContent
-        ? `${formattedMessage} / ${messageOutput.textContent}`
-        : formattedMessage;
+    ? `${message} / ${messageOutput.textContent}`
+    : message;
 }
 
 function formatKeyboardNote(note) {
     const noteNames = ['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si'];
-    return `K:${noteNames[note % 12]}${Math.floor(note / 12) - 1}`;
+    return `KB:"${noteNames[note % 12]}${Math.floor(note / 12) - 1}"`;
 }
 
 (() => {
@@ -43,7 +43,7 @@ function formatKeyboardNote(note) {
         const pad = pads.get(data.id);
         if (!pad) return;
         pad.classList.toggle('active', data.isDown);
-        if (data.isDown) prependKeyMessage(`L:tn${data.id}`);
+        if (data.isDown) prependKeyMessage(`LP:"BTN${data.id}"`);
     });
 })();
 
@@ -59,10 +59,16 @@ const CONFIG = {
     transitionDurationMs: 620
 };
 const count = CONFIG.letterCount;
+const segmentNotes = [
+    ['Do2', 'Re2'], ['Mi2', 'Fa2'], ['Sol2', 'La2'],
+    ['Si2', 'Do3'], ['Re3', 'Mi3'], ['Fa3', 'Sol3'],
+    ['La3', 'Si3'], ['Do4', 'Re4'], ['Mi4', 'Fa4']
+];
 const visualizerBottom = document.querySelector('.audio-visualizer-bottom');
-const visualizerSegments = Array.from({ length: count }, () => {
+const visualizerSegments = Array.from({ length: count }, (_, index) => {
     const segment = document.createElement('div');
     segment.className = 'audio-visualizer-segment';
+    segment.textContent = segmentNotes[index].join('\n');
     visualizerBottom.appendChild(segment);
     return segment;
 });
@@ -242,6 +248,9 @@ ablyClient.channels.get('keyboard').subscribe('midi', message => {
         document.fonts.load(`16px "${data.fontFamily}"`, 'A').then(() => {
             if (request === fontChangeRequest) {
                 wrapper.style.fontFamily = `"${data.fontFamily}"`;
+                styleStatus.textContent = data.fontFamily === 'PirelliStencil'
+                    ? 'Style: Stencil'
+                    : 'Style: Regular';
             }
         });
     }
