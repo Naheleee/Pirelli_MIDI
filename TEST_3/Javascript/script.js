@@ -2,14 +2,15 @@ const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4S
 const messageOutput = document.querySelector('.font-info2');
 
 function prependKeyMessage(message) {
+    const formattedMessage = `"${message}"`;
     messageOutput.textContent = messageOutput.textContent
-        ? `${message} ${messageOutput.textContent}`
-        : message;
+        ? `${formattedMessage} / ${messageOutput.textContent}`
+        : formattedMessage;
 }
 
 function formatKeyboardNote(note) {
     const noteNames = ['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si'];
-    return `K-${noteNames[note % 12]}${Math.floor(note / 12) - 1}`;
+    return `K:${noteNames[note % 12]}${Math.floor(note / 12) - 1}`;
 }
 
 (() => {
@@ -42,7 +43,7 @@ function formatKeyboardNote(note) {
         const pad = pads.get(data.id);
         if (!pad) return;
         pad.classList.toggle('active', data.isDown);
-        if (data.isDown) prependKeyMessage(`L-Btn${data.id}`);
+        if (data.isDown) prependKeyMessage(`L:tn${data.id}`);
     });
 })();
 
