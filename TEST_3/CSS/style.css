@@ -180,8 +180,8 @@ body {
     aspect-ratio: 1/1;
     background-color: #1A1A1A;
     background-image:
-        linear-gradient(to right, transparent calc(100% - 1px), grey calc(100% - 1px)),
-        linear-gradient(to bottom, transparent calc(100% - 1px), grey calc(100% - 1px));
+        linear-gradient(to right, transparent calc(100% - 1px), #323232 calc(100% - 1px)),
+        linear-gradient(to bottom, transparent calc(100% - 1px), #323232 calc(100% - 1px));
     background-size: 10% 100%, 100% 10%;
     display: flex;
     justify-content: center;
@@ -199,7 +199,7 @@ body {
     margin: 0;
     padding: 0;
     text-align: center;
-    color: #F46404;
+    color: #ffffff37;
 }
 
 .box2 {
