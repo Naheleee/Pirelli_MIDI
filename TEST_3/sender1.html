@@ -54,8 +54,8 @@
             grid-template-columns: repeat(9, minmax(0, 1fr));
             grid-template-rows: repeat(9, minmax(0, 1fr));
             gap: 0;
-            width: 100%;
-            height: 100%;
+            width: calc(100% + 1px);
+            height: calc(100% + 1px);
             border-top: 1px solid #f46404;
             border-left: 1px solid #f46404;
         }
@@ -93,6 +93,20 @@
 
         .pad.active {
             background: #f46404;
+            opacity: 0.5;
+        }
+
+        .pad.active::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: calc(100% + 1px);
+            height: calc(100% + 1px);
+            border-radius: 50%;
+            background: #f46404;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
         }
     </style>
 </head>
