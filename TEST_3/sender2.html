@@ -221,6 +221,10 @@
         .then(() => {
           if (request !== fontSwitchRequest) return;
           wrapper.style.fontFamily = `"${fontFamily}"`;
+          midiChannel.publish('midi', {
+            type: 'fontchange',
+            fontFamily
+          });
         })
         .catch(error => {
           console.error(

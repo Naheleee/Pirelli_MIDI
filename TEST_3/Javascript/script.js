@@ -151,7 +151,19 @@ Promise.all([
     applyWidths(animationTo);
 });
 window.addEventListener('resize', fitText);
+let fontChangeRequest = 0;
 ablyClient.channels.get('keyboard').subscribe('midi', message => {
     const data = message.data;
     if (data?.type === 'noteon') selectNote(data.note);
+    if (
+        data?.type === 'fontchange' &&
+        ['PirelliVar', 'PirelliStencil'].includes(data.fontFamily)
+    ) {
+        const request = ++fontChangeRequest;
+        document.fonts.load(`16px "${data.fontFamily}"`, 'A').then(() => {
+            if (request === fontChangeRequest) {
+                wrapper.style.fontFamily = `"${data.fontFamily}"`;
+            }
+        });
+    }
 });
