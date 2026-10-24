@@ -235,6 +235,7 @@ p {
     display: flex;
     justify-content: center;
     align-items: center;
+    overflow: hidden;
 
 }
 
@@ -244,7 +245,10 @@ p {
     margin: 0;
     padding: 0;
     color: #F46404;
+    width: 100%;
     overflow: hidden;
+    white-space: nowrap;
+    text-align: left;
 }
 
 .box4 {

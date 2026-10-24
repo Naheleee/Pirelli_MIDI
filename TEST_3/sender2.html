@@ -347,23 +347,23 @@
 
       function pressMidiNote(midi) {
         if (
-          !lettersReady ||
+          !Number.isInteger(midi) ||
           midi < firstMidiNote ||
-          midi > lastMidiNote ||
-          !whitePitchClasses.has(midi % 12)
+          midi > lastMidiNote
         ){
           return;
         }
+        midiChannel.publish('midi', { type: 'noteon', note: midi });
+        if (!lettersReady || !whitePitchClasses.has(midi % 12)) return;
         selectedGroup = getGroupIndex(midi);
         showSelectedGroup();
-        midiChannel.publish('midi', { type: 'noteon', note: midi });
       }
 
       function releaseMidiNote(midi) {
         if (
+          !Number.isInteger(midi) ||
           midi < firstMidiNote ||
-          midi > lastMidiNote ||
-          !whitePitchClasses.has(midi % 12)
+          midi > lastMidiNote
         ) return;
         midiChannel.publish('midi', { type: 'noteoff', note: midi });
       }

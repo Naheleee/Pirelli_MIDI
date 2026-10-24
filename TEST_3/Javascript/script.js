@@ -1,4 +1,17 @@
 const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
+const messageOutput = document.querySelector('.font-info2');
+
+function prependKeyMessage(message) {
+    messageOutput.textContent = messageOutput.textContent
+        ? `${message} ${messageOutput.textContent}`
+        : message;
+}
+
+function formatKeyboardNote(note) {
+    const noteNames = ['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si'];
+    return `K-${noteNames[note % 12]}${Math.floor(note / 12) - 1}`;
+}
+
 (() => {
     const rows = [
         { base: 81, scene: 89 }, { base: 71, scene: 79 },
@@ -26,7 +39,10 @@ const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4S
     ablyClient.channels.get('launchpad').subscribe('midi', message => {
         const data = message.data;
         if (!data || !Number.isInteger(data.id) || typeof data.isDown !== 'boolean') return;
-        pads.get(data.id)?.classList.toggle('active', data.isDown);
+        const pad = pads.get(data.id);
+        if (!pad) return;
+        pad.classList.toggle('active', data.isDown);
+        if (data.isDown) prependKeyMessage(`L-Btn${data.id}`);
     });
 })();
 
@@ -208,7 +224,14 @@ window.addEventListener('resize', fitText);
 let fontChangeRequest = 0;
 ablyClient.channels.get('keyboard').subscribe('midi', message => {
     const data = message.data;
-    if (data?.type === 'noteon') selectNote(data.note);
+    if (data?.type === 'noteon') {
+        if (
+            Number.isInteger(data.note) &&
+            data.note >= CONFIG.midiFirstNote &&
+            data.note <= CONFIG.midiLastNote
+        ) prependKeyMessage(formatKeyboardNote(data.note));
+        selectNote(data.note);
+    }
     if (data?.type === 'noteoff') releaseNote(data.note);
     if (
         data?.type === 'fontchange' &&
