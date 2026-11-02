@@ -229,8 +229,19 @@ Promise.all([
 });
 window.addEventListener('resize', fitText);
 let fontChangeRequest = 0;
+const looperSquares = Array.from(document.querySelectorAll('.looper-square'));
 ablyClient.channels.get('keyboard').subscribe('midi', message => {
     const data = message.data;
+    if (
+        data?.type === 'beat' &&
+        Number.isInteger(data.beat) &&
+        data.beat >= 1 &&
+        data.beat <= looperSquares.length
+    ) {
+        looperSquares.forEach((square, index) => {
+            square.classList.toggle('active', index === data.beat - 1);
+        });
+    }
     if (data?.type === 'noteon') {
         if (
             Number.isInteger(data.note) &&

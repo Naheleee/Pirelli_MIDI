@@ -67,7 +67,6 @@
       border: 1px solid #F46404;
       color: #F46404;
       font-size: 16px;
-      transition: background-color 80ms linear, color 80ms linear;
     }
     .beat-square.active {
       background: #F46404;
@@ -464,6 +463,12 @@
           square.classList.toggle('active', index === beat);
         });
         loopCountDisplay.textContent = String(loop).padStart(2, '0');
+        midiChannel.publish('midi', {
+          type: 'beat',
+          beat: beat + 1,
+          loop,
+          bpm: 70
+        });
         if (beat === 0 && pendingSoundIndex !== null) {
           const sound = keyboardSounds[pendingSoundIndex];
           pendingSoundIndex = null;
