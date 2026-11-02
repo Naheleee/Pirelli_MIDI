@@ -323,21 +323,6 @@ p {
     align-items: center;
 }
 
-.square1 {
-    position: relative;
-    margin: 0;
-    padding: 0;
-    height: 100%;
-    aspect-ratio: 1/1;
-    flex: 0 0 auto;
-    background-color: #F46404;
-    border: 1px solid #1A1A1A;
-    background-image:
-        linear-gradient(to right, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px)),
-        linear-gradient(to bottom, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px));
-    background-size: 50% 100%, 100% 50%;
-}
-
 .audio-visualizer {
     margin: 0;
     padding: 0;
@@ -400,6 +385,20 @@ p {
     color: #F46404;
 }
 
+.square1 {
+    position: relative;
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    aspect-ratio: 1/1;
+    flex: 0 0 auto;
+    background-color: #F46404;
+    background-image:
+        linear-gradient(to right, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px)),
+        linear-gradient(to bottom, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px));
+    background-size: 50% 100%, 100% 50%;
+}
+
 .square2 {
     position: relative;
     margin: 0;
@@ -408,7 +407,6 @@ p {
     aspect-ratio: 1/1;
     flex: 0 0 auto;
     background-color: #F46404;
-    border: 1px solid #1A1A1A;
     background-image:
         linear-gradient(to right, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px)),
         linear-gradient(to bottom, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px));
