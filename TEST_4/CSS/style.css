@@ -374,24 +374,6 @@ p {
     border: 0;
 }
 
-.audio-enable {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    padding: 0.6em 1em;
-    border: 1px solid #F46404;
-    background: #1A1A1A;
-    color: #F46404;
-    font: inherit;
-    cursor: pointer;
-    transform: translate(-50%, -50%);
-}
-
-.audio-enable:focus-visible {
-    outline: 2px solid white;
-    outline-offset: 2px;
-}
-
 .note-visualizer {
     margin: 0;
     padding: 0;
