@@ -29,49 +29,6 @@
       overflow: hidden;
       background: #000;
     }
-    #beat-display {
-      position: fixed;
-      top: 16px;
-      left: 50%;
-      z-index: 2;
-      display: grid;
-      gap: 8px;
-      width: min(240px, calc(100vw - 32px));
-      padding: 10px;
-      border: 1px solid #F46404;
-      background: rgba(0, 0, 0, 0.85);
-      color: #F46404;
-      font: 12px Arial, sans-serif;
-      letter-spacing: 0.08em;
-      transform: translateX(-50%);
-      user-select: none;
-    }
-    .beat-display-info {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-    }
-    .beat-display-tempo {
-      font-size: 16px;
-      font-weight: 700;
-    }
-    .beat-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 6px;
-    }
-    .beat-square {
-      display: grid;
-      aspect-ratio: 1;
-      place-items: center;
-      border: 1px solid #F46404;
-      color: #F46404;
-      font-size: 16px;
-    }
-    .beat-square.active {
-      background: #F46404;
-      color: #1A1A1A;
-    }
     #square {
       width: 100%;
       height: min(100vw, 100vh);
@@ -99,18 +56,6 @@
   </style>
 </head>
 <body>
-  <aside id="beat-display" aria-label="Tempo and four-beat loop">
-    <div class="beat-display-info">
-      <span class="beat-display-tempo">70 BPM</span>
-      <span>LOOP <span id="loop-count">01</span></span>
-    </div>
-    <div class="beat-grid" role="group" aria-label="Loop beats">
-      <div class="beat-square active" aria-label="Beat 1">1</div>
-      <div class="beat-square" aria-label="Beat 2">2</div>
-      <div class="beat-square" aria-label="Beat 3">3</div>
-      <div class="beat-square" aria-label="Beat 4">4</div>
-    </div>
-  </aside>
   <main id="square">
     <div id="wrapper"></div>
   </main>
@@ -463,28 +408,14 @@
       Tone.Transport.loop = true;
       Tone.Transport.loopStart = 0;
       Tone.Transport.loopEnd = '1m';
-      const beatSquares = Array.from(
-        document.querySelectorAll('.beat-square')
-      );
-      const loopCountDisplay = document.getElementById('loop-count');
+      const beatsPerLoop = 4;
       let transportBeatCount = 0;
       let activeKeyboardSound = null;
       let pendingSoundIndex = null;
       let keyboardSoundRequest = 0;
 
       Tone.Transport.scheduleRepeat(time => {
-        const beat = transportBeatCount % beatSquares.length;
-        const loop = Math.floor(transportBeatCount / beatSquares.length) + 1;
-        beatSquares.forEach((square, index) => {
-          square.classList.toggle('active', index === beat);
-        });
-        loopCountDisplay.textContent = String(loop).padStart(2, '0');
-        midiChannel.publish('midi', {
-          type: 'beat',
-          beat: beat + 1,
-          loop,
-          bpm: 70
-        });
+        const beat = transportBeatCount % beatsPerLoop;
         if (beat === 0 && pendingSoundIndex !== null) {
           const sound = keyboardSounds[pendingSoundIndex];
           pendingSoundIndex = null;
@@ -532,6 +463,23 @@
       });
 
       const connectedMidiInputs = new WeakSet();
+      let activeMidiInput = null;
+      let keyboardPresenceActive = false;
+
+      async function setKeyboardPresence(isConnected) {
+        if (keyboardPresenceActive === isConnected) return;
+        keyboardPresenceActive = isConnected;
+        try {
+          if (isConnected) {
+            await midiChannel.presence.enter({ instrument: 'keyboard' });
+          } else {
+            await midiChannel.presence.leave();
+          }
+        } catch (error) {
+          keyboardPresenceActive = !isConnected;
+          console.error('Failed to update keyboard MIDI presence:', error);
+        }
+      }
 
       function connectMidiInput(input) {
         if (!input || connectedMidiInputs.has(input)) return;
@@ -549,26 +497,39 @@
         });
       }
 
+      function findMidiInput() {
+        return WebMidi.inputs.find(device =>
+          /launchkey|novation/i.test(device.name)
+        ) ||
+          WebMidi.inputs.find(device =>
+            device.name.toLowerCase().includes('bk-3')
+          ) ||
+          WebMidi.inputs.find(device =>
+            device.name.toLowerCase().includes('roland')
+          ) ||
+          WebMidi.inputs[0] ||
+          null;
+      }
+
       async function initMIDI() {
         try {
           await WebMidi.enable();
-          const input =
-            WebMidi.inputs.find(device =>
-              /launchkey|novation/i.test(device.name)
-            ) ||
-            WebMidi.inputs.find(device =>
-              device.name.toLowerCase().includes('bk-3')
-            ) ||
-            WebMidi.inputs.find(device =>
-              device.name.toLowerCase().includes('roland')
-            ) ||
-            WebMidi.inputs[0];
-
-          if (input) connectMidiInput(input);
-          else console.warn('Nessun dispositivo MIDI trovato.');
+          activeMidiInput = findMidiInput();
+          if (activeMidiInput) connectMidiInput(activeMidiInput);
+          void setKeyboardPresence(Boolean(activeMidiInput));
 
           WebMidi.addListener('connected', event => {
             connectMidiInput(event.port);
+            if (!activeMidiInput) {
+              activeMidiInput = findMidiInput();
+              void setKeyboardPresence(Boolean(activeMidiInput));
+            }
+          });
+          WebMidi.addListener('disconnected', event => {
+            if (event.port !== activeMidiInput) return;
+            activeMidiInput = findMidiInput();
+            if (activeMidiInput) connectMidiInput(activeMidiInput);
+            void setKeyboardPresence(Boolean(activeMidiInput));
           });
         } catch (error) {
           console.error('Errore WebMIDI:', error);

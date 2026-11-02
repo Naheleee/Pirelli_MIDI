@@ -160,6 +160,7 @@
         let midiAccess = null;
         let midiInput = null;
         let midiOutput = null;
+        let launchpadPresenceActive = false;
         const matrix = document.getElementById('matrix');
         const status = document.getElementById('status');
 
@@ -225,6 +226,21 @@
             midiChannel.publish('midi', { id, isDown: false });
         }
 
+        async function setLaunchpadPresence(isConnected) {
+            if (launchpadPresenceActive === isConnected) return;
+            launchpadPresenceActive = isConnected;
+            try {
+                if (isConnected) {
+                    await midiChannel.presence.enter({ instrument: 'launchpad' });
+                } else {
+                    await midiChannel.presence.leave();
+                }
+            } catch (error) {
+                launchpadPresenceActive = !isConnected;
+                console.error('Failed to update Launchpad presence:', error);
+            }
+        }
+
         function handleMidiMessage(event) {
             const [statusByte, number, velocity] = event.data;
             const command = statusByte & 0xf0;
@@ -255,6 +271,7 @@
                 if (midiInput) midiInput.onmidimessage = null;
                 midiInput = null;
                 midiOutput = null;
+                void setLaunchpadPresence(false);
                 connectButton.textContent = 'Connect';
                 connectButton.title = 'Connect Launchpad';
                 return;
@@ -282,6 +299,7 @@
             midiOutput = outputs.find(isLaunchpad) || outputs[0] || null;
 
             if (midiInput) midiInput.onmidimessage = handleMidiMessage;
+            void setLaunchpadPresence(Boolean(midiInput || midiOutput));
             if (!midiInput && !midiOutput) {
                 document.getElementById('connect').textContent = 'Connect';
                 document.getElementById('connect').title =

@@ -64,8 +64,8 @@ body {
 
 .cell1 {
     margin: 0;
-    padding: clamp(2px, 1cqw, 10px);
-    padding-top: clamp(1px, 0.3cqw, 3px);
+    padding: 20px;
+    padding-top: 10px;
     width: 100%;
     min-width: 0;
     min-height: 0;
@@ -93,7 +93,7 @@ body {
 
 .cell2 {
     margin: 0;
-    padding: 0;
+    padding: 0 20px 20px 20px;
     width: 100%;
     min-width: 0;
     min-height: 0;
@@ -116,6 +116,7 @@ body {
         linear-gradient(to right, transparent calc(50% - 0.5px), #1A1A1A calc(50% - 0.5px), #1A1A1A calc(50% + 0.5px), transparent calc(50% + 0.5px)),
         linear-gradient(to bottom, transparent calc(50% - 0.5px), #1A1A1A calc(50% - 0.5px), #1A1A1A calc(50% + 0.5px), transparent calc(50% + 0.5px));
     background-size: 100% 100%;
+    border-right: 1px solid #1A1A1A;
 }
 
 .glifo1 {
@@ -189,7 +190,7 @@ body {
     min-height: 0;
     border: 1px solid #F46404;
     color: #F46404;
-    font-size: 2rem;
+    font-size: 4rem;
     font-variation-settings: "wdth"100;
     transition:
         font-variation-settings 320ms cubic-bezier(0.22, 1, 0.36, 1),
@@ -386,7 +387,7 @@ body {
 .font-info1 {
     display: flex;
     flex-direction: start;
-    padding-left: 15px;
+    padding-left: 20px;
     gap: 4%;
     align-items: left;
     width: 100%;
@@ -576,7 +577,6 @@ p {
     display: flex;
     justify-content: center;
     align-items: center;
-
     border-top: none;
     overflow: hidden;
 }

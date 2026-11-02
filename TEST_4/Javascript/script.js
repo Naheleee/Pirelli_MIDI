@@ -2,6 +2,47 @@ const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4S
 const messageOutput = document.querySelector('.font-info2');
 const styleStatus = document.querySelector('.style-status');
 
+function watchMidiDeviceStatus(channelName, statusElement) {
+    const presence = ablyClient.channels.get(channelName).presence;
+    const members = new Set();
+    const queuedEvents = [];
+    let snapshotLoaded = false;
+
+    function updateStatus() {
+        statusElement.textContent = members.size > 0 ? 'Connected' : 'OFF';
+    }
+
+    function applyPresenceEvent(action, member) {
+        const memberId = `${member.connectionId}:${member.clientId}`;
+        if (action === 'enter' || action === 'update') members.add(memberId);
+        else if (action === 'leave') members.delete(memberId);
+        updateStatus();
+    }
+
+    for (const action of ['enter', 'update', 'leave']) {
+        presence.subscribe(action, member => {
+            if (!snapshotLoaded) queuedEvents.push([action, member]);
+            else applyPresenceEvent(action, member);
+        });
+    }
+
+    presence.get().then(currentMembers => {
+        currentMembers.forEach(member => {
+            members.add(`${member.connectionId}:${member.clientId}`);
+        });
+        snapshotLoaded = true;
+        queuedEvents.forEach(([action, member]) => applyPresenceEvent(action, member));
+        queuedEvents.length = 0;
+        updateStatus();
+    }).catch(error => {
+        console.error(`Failed to read ${channelName} MIDI presence:`, error);
+    });
+}
+
+document.querySelectorAll('.midi-device-status').forEach(statusElement => {
+    watchMidiDeviceStatus(statusElement.dataset.channel, statusElement);
+});
+
 function prependKeyMessage(message) {
     messageOutput.textContent = messageOutput.textContent
     ? `${message} / ${messageOutput.textContent}`
@@ -417,18 +458,22 @@ Promise.all([
 });
 let fontChangeRequest = 0;
 const looperSquares = Array.from(document.querySelectorAll('.looper-square'));
+let activeLooperBeat = 0;
+
+function advanceLooper() {
+    looperSquares.forEach((square, index) => {
+        square.classList.toggle('active', index === activeLooperBeat);
+    });
+    activeLooperBeat = (activeLooperBeat + 1) % looperSquares.length;
+}
+
+if (looperSquares.length > 0) {
+    advanceLooper();
+    window.setInterval(advanceLooper, 60000 / 70);
+}
+
 ablyClient.channels.get('keyboard').subscribe('midi', message => {
     const data = message.data;
-    if (
-        data?.type === 'beat' &&
-        Number.isInteger(data.beat) &&
-        data.beat >= 1 &&
-        data.beat <= looperSquares.length
-    ) {
-        looperSquares.forEach((square, index) => {
-            square.classList.toggle('active', index === data.beat - 1);
-        });
-    }
     if (data?.type === 'noteon') {
         if (
             Number.isInteger(data.note) &&
