@@ -250,8 +250,6 @@ body {
 }
 
 .section2 {
-    position: relative;
-    isolation: isolate;
     margin: 0;
     padding: 0;
     width: 40%;
@@ -265,24 +263,103 @@ body {
     overflow: hidden;
 }
 
-.section2::before {
+.section2-frame {
+    position: relative;
+    isolation: isolate;
+    flex: 0 0 auto;
+    width: calc(100% - 40px);
+    height: calc(100% - 40px);
+    min-width: 0;
+    min-height: 0;
+    margin: 20px;
+    background-color: #1A1A1A;
+    border: 1px solid #777;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.type-guides {
     position: absolute;
-    z-index: 0;
+    z-index: 2;
     inset: 0;
-    background-image:
-        linear-gradient(to right, transparent calc(100% - 1px), #323232 calc(100% - 1px)),
-        linear-gradient(to bottom, transparent calc(100% - 1px), #323232 calc(100% - 1px));
-    background-size: 10% 100%, 100% 10%;
-    clip-path: inset(0 1px 1px 0);
-    content: "";
+    overflow: hidden;
+    contain: paint;
     pointer-events: none;
+    color: #999;
+    font-family: "PirelliVar", sans-serif;
+}
+
+.type-guide {
+    position: absolute;
+    top: var(--guide-y, 50%);
+    right: 0;
+    left: 0;
+    border-top: 1px solid #777;
+}
+
+.type-guide > span {
+    position: absolute;
+    top: 3px;
+    left: 0;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    padding: 0 clamp(2px, 0.4cqw, 4px);
+    color: #666;
+    font-family: "PirelliVar", sans-serif;
+    font-variation-settings: "wdth" 500;
+    font-size: clamp(4px, 1.3cqw, 10px);
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.guide-label,
+.guide-value,
+.width-value {
+    background-color: #1A1A1A;
+    color: #666;
+}
+
+.type-guide[data-metric="cap-height"] span {
+    top: 3px;
+}
+
+.type-guide[data-metric="x-height"] span {
+    top: calc(3px + 1em);
+}
+
+.type-guide[data-metric="typo-descender"] span {
+    top: auto;
+    bottom: 3px;
+}
+
+.width-value {
+    position: absolute;
+    top: var(--width-label-y, 3px);
+    left: var(--width-label-x, 0);
+    padding: 0 2px;
+    font-family: "PirelliVar", sans-serif;
+    font-variation-settings: "wdth" 500;
+    font-size: clamp(4px, 1.3cqw, 10px);
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.width-guide {
+    position: absolute;
+    top: var(--width-top, 0);
+    height: var(--width-height, 100%);
+    border-left: 1px solid #777;
+    transform: translateX(-50%);
 }
 
 .lettera {
     position: relative;
     z-index: 1;
-    font-variation-settings: "wdth"500;
-    font-size: clamp(1rem, 32cqw, 25rem);
+    font-variation-settings: "wdth" 500;
+    font-size: clamp(1rem, 28cqw, 25rem);
     line-height: 1;
     width: 100%;
     height: auto;

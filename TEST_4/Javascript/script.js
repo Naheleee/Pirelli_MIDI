@@ -13,6 +13,190 @@ function formatKeyboardNote(note) {
     return `KB:"${noteNames[note % 12]}${Math.floor(note / 12) - 1}"`;
 }
 
+const letter = document.querySelector('.lettera');
+const widthStatus = document.querySelector('.width-status');
+const widthGuides = [
+    document.querySelector('.width-guide-left'),
+    document.querySelector('.width-guide-right')
+];
+const typeGuides = new Map(
+    Array.from(document.querySelectorAll('.type-guide'), guide => [
+        guide.dataset.metric,
+        guide
+    ])
+);
+const guideContainer = document.querySelector('.type-guides');
+const widthValue = document.querySelector('.width-value');
+const widthValues = new Map();
+const launchpadWidth = { firstPad: 81, lastPad: 88, min: 100, max: 500 };
+let currentFontWidth = launchpadWidth.max;
+let renderedFontWidth = currentFontWidth;
+let widthAnimationFrame = null;
+const widthTransitionDuration = 620;
+letter.style.fontVariationSettings = `"wdth" ${currentFontWidth}`;
+widthStatus.textContent = String(currentFontWidth);
+const widthProbe = document.createElement('span');
+widthProbe.textContent = letter.textContent;
+widthProbe.setAttribute('aria-hidden', 'true');
+widthProbe.style.cssText =
+    'position:fixed;left:-10000px;top:0;display:inline-block;visibility:hidden;white-space:pre;margin:0;padding:0;';
+document.body.appendChild(widthProbe);
+
+for (let pad = launchpadWidth.firstPad; pad <= launchpadWidth.lastPad; pad++) {
+    const width = Math.round(
+        launchpadWidth.min +
+        (pad - launchpadWidth.firstPad) /
+            (launchpadWidth.lastPad - launchpadWidth.firstPad) *
+            (launchpadWidth.max - launchpadWidth.min)
+    );
+    widthValues.set(pad, width);
+}
+
+function setLetterWidth(width) {
+    const targetWidth = Math.max(
+        launchpadWidth.min,
+        Math.min(launchpadWidth.max, width)
+    );
+    if (widthAnimationFrame !== null) {
+        cancelAnimationFrame(widthAnimationFrame);
+    }
+
+    currentFontWidth = targetWidth;
+    widthStatus.textContent = String(targetWidth);
+    const startWidth = renderedFontWidth;
+    let startTime = null;
+
+    function animateWidth(time) {
+        if (startTime === null) startTime = time;
+        const progress = Math.min(1, (time - startTime) / widthTransitionDuration);
+        const easedProgress = easeWidthTransition(progress);
+        renderedFontWidth = startWidth + (targetWidth - startWidth) * easedProgress;
+        letter.style.fontVariationSettings = `"wdth" ${renderedFontWidth}`;
+        widthValue.textContent = String(Math.round(renderedFontWidth));
+        updateWidthGuides(renderedFontWidth);
+
+        if (progress < 1) {
+            widthAnimationFrame = requestAnimationFrame(animateWidth);
+        } else {
+            renderedFontWidth = targetWidth;
+            widthValue.textContent = String(targetWidth);
+            updateWidthGuides(targetWidth);
+            widthAnimationFrame = null;
+        }
+    }
+
+    widthAnimationFrame = requestAnimationFrame(animateWidth);
+}
+
+function easeWidthTransition(progress) {
+    const bezier = (t, first, second) =>
+        3 * (1 - t) ** 2 * t * first +
+        3 * (1 - t) * t ** 2 * second +
+        t ** 3;
+    let low = 0;
+    let high = 1;
+    let parameter = progress;
+
+    for (let iteration = 0; iteration < 16; iteration++) {
+        parameter = (low + high) / 2;
+        if (bezier(parameter, 0.22, 0.36) < progress) low = parameter;
+        else high = parameter;
+    }
+    return bezier(parameter, 1, 1);
+}
+
+const metricsContext = document.createElement('canvas').getContext('2d');
+if (!metricsContext) throw new Error('Unable to create a canvas for font metrics.');
+
+function updateWidthGuides(width) {
+    const letterStyles = getComputedStyle(letter);
+    widthProbe.style.fontFamily = letterStyles.fontFamily;
+    widthProbe.style.fontSize = letterStyles.fontSize;
+    widthProbe.style.fontWeight = letterStyles.fontWeight;
+    widthProbe.style.fontStyle = letterStyles.fontStyle;
+    widthProbe.style.fontVariationSettings = `"wdth" ${width}`;
+    widthProbe.style.letterSpacing = letterStyles.letterSpacing;
+
+    const letterBounds = letter.getBoundingClientRect();
+    const guidesBounds = document.querySelector('.type-guides').getBoundingClientRect();
+    const glyphWidth = widthProbe.getBoundingClientRect().width;
+    const glyphCenter = letterBounds.left + letterBounds.width / 2 - guidesBounds.left;
+    const halfWidth = glyphWidth / 2;
+    const leftEdge = glyphCenter - halfWidth;
+    const rightEdge = glyphCenter + halfWidth;
+    widthGuides[0].style.left = `${leftEdge}px`;
+    widthGuides[1].style.left = `${rightEdge}px`;
+    widthValue.textContent = String(Math.round(width));
+    const valueWidth = widthValue.getBoundingClientRect().width;
+    const labelLeft = Math.min(
+        rightEdge + 4,
+        guidesBounds.width - valueWidth - 2
+    );
+    widthValue.style.setProperty('--width-label-x', `${Math.max(2, labelLeft)}px`);
+}
+
+function updateTypeGuides() {
+    const letterStyles = getComputedStyle(letter);
+    const fontSize = Number.parseFloat(letterStyles.fontSize);
+    const letterBounds = letter.getBoundingClientRect();
+    const guidesBounds = document.querySelector('.type-guides').getBoundingClientRect();
+    metricsContext.font = `${letterStyles.fontStyle} ${letterStyles.fontWeight} ${fontSize}px ${letterStyles.fontFamily}`;
+
+    const fontMetrics = metricsContext.measureText('A');
+    const ascent = fontMetrics.fontBoundingBoxAscent || fontSize * 0.8;
+    const descent = fontMetrics.fontBoundingBoxDescent || fontSize * 0.2;
+    const baseline = letterBounds.top - guidesBounds.top +
+        (letterBounds.height - ascent - descent) / 2 + ascent;
+    const metricScale = fontSize / 1000;
+    const positions = {
+        'typo-ascender': baseline - 960 * metricScale,
+        'cap-height': baseline - 720 * metricScale,
+        'x-height': baseline - 432 * metricScale,
+        baseline,
+        'typo-descender': baseline + 240 * metricScale
+    };
+
+    const guideHeight = guideContainer.clientHeight;
+    const displayedPositions = {};
+    for (const [metric, position] of Object.entries(positions)) {
+        const displayedPosition = Math.max(0, Math.min(guideHeight - 1, position));
+        displayedPositions[metric] = displayedPosition;
+        const guide = typeGuides.get(metric);
+        guide.style.setProperty('--guide-y', `${displayedPosition}px`);
+        const metricValue = {
+            'typo-ascender': 960,
+            'cap-height': 720,
+            'x-height': 432,
+            baseline: 0,
+            'typo-descender': -240
+        }[metric];
+        guide.querySelector('.guide-value').textContent = String(metricValue);
+    }
+    guideContainer.style.setProperty(
+        '--width-top',
+        `${displayedPositions['typo-ascender']}px`
+    );
+    guideContainer.style.setProperty(
+        '--width-label-y',
+        `${displayedPositions['typo-ascender'] + 3}px`
+    );
+    guideContainer.style.setProperty(
+        '--width-height',
+        `${displayedPositions['typo-descender'] - displayedPositions['typo-ascender']}px`
+    );
+}
+
+document.fonts.load('16px "PirelliVar"', 'AHx')
+    .then(() => requestAnimationFrame(() => {
+        updateTypeGuides();
+        updateWidthGuides(currentFontWidth);
+    }))
+    .catch(error => console.error('Failed to load Pirelli font metrics:', error));
+window.addEventListener('resize', () => {
+    updateTypeGuides();
+    updateWidthGuides(renderedFontWidth);
+});
+
 (() => {
     const rows = [
         { base: 81, scene: 89 }, { base: 71, scene: 79 },
@@ -43,7 +227,11 @@ function formatKeyboardNote(note) {
         const pad = pads.get(data.id);
         if (!pad) return;
         pad.classList.toggle('active', data.isDown);
-        if (data.isDown) prependKeyMessage(`LP:"BTN${data.id}"`);
+        if (data.isDown) {
+            prependKeyMessage(`LP:"BTN${data.id}"`);
+            const width = widthValues.get(data.id);
+            if (width !== undefined) setLetterWidth(width);
+        }
     });
 })();
 
@@ -258,6 +446,8 @@ ablyClient.channels.get('keyboard').subscribe('midi', message => {
         document.fonts.load(`16px "${data.fontFamily}"`, 'A').then(() => {
             if (request === fontChangeRequest) {
                 wrapper.style.fontFamily = `"${data.fontFamily}"`;
+                updateTypeGuides();
+                updateWidthGuides(currentFontWidth);
                 styleStatus.textContent = data.fontFamily === 'PirelliStencil'
                     ? 'Stencil'
                     : 'Regular';
