@@ -453,42 +453,39 @@
       );
       const loopCountDisplay = document.getElementById('loop-count');
       let transportBeatCount = 0;
-      Tone.Transport.scheduleRepeat(() => {
+      let activeKeyboardSound = null;
+      let pendingSoundIndex = null;
+      let keyboardSoundRequest = 0;
+
+      Tone.Transport.scheduleRepeat(time => {
         const beat = transportBeatCount % beatSquares.length;
         const loop = Math.floor(transportBeatCount / beatSquares.length) + 1;
         beatSquares.forEach((square, index) => {
           square.classList.toggle('active', index === beat);
         });
         loopCountDisplay.textContent = String(loop).padStart(2, '0');
+        if (beat === 0 && pendingSoundIndex !== null) {
+          const sound = keyboardSounds[pendingSoundIndex];
+          pendingSoundIndex = null;
+          if (activeKeyboardSound) activeKeyboardSound.stop(time);
+          sound.start(time);
+          activeKeyboardSound = sound;
+        }
         transportBeatCount++;
       }, '4n');
-      let activeKeyboardSound = null;
-      let pendingSoundEvent = null;
-      let keyboardSoundRequest = 0;
 
       function playKeyboardSound(index) {
-        if (pendingSoundEvent !== null) {
-          Tone.Transport.clear(pendingSoundEvent);
-          pendingSoundEvent = null;
-        }
         const request = ++keyboardSoundRequest;
         void (async () => {
           await Tone.start();
           await keyboardSoundsReady;
           if (request !== keyboardSoundRequest) return;
 
+          pendingSoundIndex = index;
           if (Tone.Transport.state !== 'started') Tone.Transport.start();
-          const sound = keyboardSounds[index];
-          pendingSoundEvent = Tone.Transport.scheduleOnce(time => {
-            pendingSoundEvent = null;
-            if (request !== keyboardSoundRequest) return;
-            if (activeKeyboardSound) activeKeyboardSound.stop(time);
-            sound.start(time);
-            activeKeyboardSound = sound;
-          }, Tone.Transport.nextSubdivision('4n'));
         })().catch(error => {
           if (request === keyboardSoundRequest) {
-            console.error('Failed to schedule keyboard sound:', error);
+            console.error('Failed to load or start keyboard sound:', error);
           }
         });
       }
