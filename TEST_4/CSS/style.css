@@ -268,16 +268,50 @@ p {
 .square1 {
     position: relative;
     margin: 0;
-    padding: 0;
+    padding: 2px;
     width: auto;
     height: 100%;
     aspect-ratio: 1/1;
+    display: grid;
+    grid-template-areas:
+        "beat1 beat2"
+        "beat4 beat3";
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: repeat(2, minmax(0, 1fr));
+    background-color: #1A1A1A;
+}
+
+.looper-square {
+    display: grid;
+    place-items: center;
+    min-width: 0;
+    min-height: 0;
+    background-color: #1A1A1A;
+    color: #F46404;
+    font-size: clamp(20px, 5vmin, 48px);
+    line-height: 1;
+    font-variation-settings: "wdth" 500;
+}
+
+.looper-square:nth-child(1) {
+    grid-area: beat1;
+}
+
+.looper-square:nth-child(2) {
+    grid-area: beat2;
+}
+
+.looper-square:nth-child(3) {
+    grid-area: beat3;
+}
+
+.looper-square:nth-child(4) {
+    grid-area: beat4;
+}
+
+.looper-square.active {
     background-color: #F46404;
-    border: 1px solid #1A1A1A;
-    background-image:
-        linear-gradient(to right, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px)),
-        linear-gradient(to bottom, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px));
-    background-size: 50% 100%, 100% 50%;
+    color: #1A1A1A;
 }
 
 .audio-visualizer {
@@ -343,7 +377,6 @@ p {
     background-size: 50% 100%, 100% 50%;
 }
 
-.square1::after,
 .square2::after {
     content: "";
     position: absolute;
