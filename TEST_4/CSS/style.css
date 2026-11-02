@@ -265,7 +265,7 @@ p {
     align-items: center;
 }
 
-.square1 {
+.looper {
     box-sizing: border-box;
     position: relative;
     margin: 0;
@@ -279,8 +279,6 @@ p {
         "beat4 beat3";
     grid-template-columns: repeat(2, minmax(0, 1fr));
     grid-template-rows: repeat(2, minmax(0, 1fr));
-    background-color: #1A1A1A;
-    outline: 1px solid #F46404;
 }
 
 .looper-square {
@@ -291,7 +289,7 @@ p {
     min-height: 0;
     background-color: #1A1A1A;
     color: #F46404;
-    border: 0.5px solid #F46404;
+    border: 1px solid #F46404;
     font-size: clamp(20px, 5vmin, 48px);
     line-height: 1;
     font-variation-settings: "wdth" 100;
@@ -317,7 +315,7 @@ p {
 .looper-square.active {
     background-color: #F46404;
     color: #1A1A1A;
-    border: 2px solid #1A1A1A;
+    border: 1px solid #1A1A1A;
     font-variation-settings: "wdth" 500;
 }
 
@@ -344,7 +342,6 @@ p {
     display: grid;
     grid-template-columns: repeat(9, minmax(0, 1fr));
     background-color: #F46404;
-    border-bottom: 1px solid #1A1A1A;
 }
 
 .audio-visualizer-segment {
@@ -369,6 +366,32 @@ p {
     color: #F46404;
 }
 
+.square1 {
+    position: relative;
+    margin: 0;
+    padding: 0;
+    width: auto;
+    height: 100%;
+    aspect-ratio: 1/1;
+    background-color: #F46404;
+    background-image:
+        linear-gradient(to right, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px)),
+        linear-gradient(to bottom, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px));
+    background-size: 50% 100%, 100% 50%;
+}
+
+.square1::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 99%;
+    aspect-ratio: 1 / 1;
+    border: 1px solid #1A1A1A;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+}
+
 .square2 {
     position: relative;
     margin: 0;
@@ -377,7 +400,6 @@ p {
     height: 100%;
     aspect-ratio: 1/1;
     background-color: #F46404;
-    border: 1px solid #1A1A1A;
     background-image:
         linear-gradient(to right, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px)),
         linear-gradient(to bottom, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px));
