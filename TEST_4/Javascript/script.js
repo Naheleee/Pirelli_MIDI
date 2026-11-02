@@ -227,7 +227,6 @@ Promise.all([
     } else applyWidths(animationTo);
     pendingMidiNote = null;
 });
-window.addEventListener('resize', fitText);
 let fontChangeRequest = 0;
 const looperSquares = Array.from(document.querySelectorAll('.looper-square'));
 ablyClient.channels.get('keyboard').subscribe('midi', message => {
