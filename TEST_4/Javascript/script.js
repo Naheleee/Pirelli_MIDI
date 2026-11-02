@@ -64,7 +64,7 @@ const segmentNotes = [
     ['Si2', 'Do3'], ['Re3', 'Mi3'], ['Fa3', 'Sol3'],
     ['La3', 'Si3'], ['Do4', 'Re4'], ['Mi4', 'Fa4']
 ];
-const visualizerBottom = document.querySelector('.audio-visualizer-bottom');
+const visualizerBottom = document.querySelector('.note-visualizer');
 const visualizerSegments = Array.from({ length: count }, (_, index) => {
     const segment = document.createElement('div');
     segment.className = 'audio-visualizer-segment';

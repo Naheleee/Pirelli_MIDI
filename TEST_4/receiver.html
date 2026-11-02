@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pirelli</title>
     <link rel="stylesheet" href="CSS/style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
     <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
 </head>
 
@@ -46,12 +47,13 @@
         </div>
         <div class="box4">
             <div class="square1"></div>
-            <div class="audio-visualizer">
-                <div class="audio-visualizer-top">
+            <div class="visualizers">
+                <div class="audio-visualizer">
                     <iframe src="audiospectrum.html" title="Audio spectrum visualizer"
                         allow="display-capture *"></iframe>
+                    <button class="audio-enable" type="button">Enable audio</button>
                 </div>
-                <div class="audio-visualizer-bottom"></div>
+                <div class="note-visualizer"></div>
             </div>
             <div class="square2"></div>
         </div>
