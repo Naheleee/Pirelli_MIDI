@@ -261,6 +261,7 @@ document.fonts.load('16px "PirelliVar"', 'AHx')
     .catch(error => console.error('Failed to load Pirelli font metrics:', error));
 window.addEventListener('resize', () => {
     fitTitle();
+    fitText();
     updateTypeGuides();
     updateWidthGuides(renderedFontWidth);
 });
@@ -378,6 +379,7 @@ function getFittedFontSize(widths, fontFamily) {
 
 function fitText() {
     wrapper.style.width = '100%';
+    const previousWidths = spans.map(span => span.style.fontVariationSettings);
     spans.forEach((span, index) => {
         span.style.marginLeft = index === 0 ? '0px' : `${CONFIG.letterGap}px`;
         span.style.fontVariationSettings = `'wdth' ${CONFIG.minFontWidth}`;
@@ -391,6 +393,9 @@ function fitText() {
             );
         }
     }
+    spans.forEach((span, index) => {
+        span.style.fontVariationSettings = previousWidths[index];
+    });
     wrapper.style.fontSize = `${fittedFontSize}px`;
 }
 

@@ -31,10 +31,10 @@ body {
 .container {
     margin: 0;
     padding: 0;
-    width: min(100vw, 100vh);
-    height: min(100vw, 100vh);
-    width: min(100vw, 100dvh);
-    height: min(100vw, 100dvh);
+    width: min(100vw, 100vh, 1600px);
+    height: min(100vw, 100vh, 1600px);
+    width: min(100vw, 100dvh, 1600px);
+    height: min(100vw, 100dvh, 1600px);
     display: grid;
     grid-template-rows: minmax(0, 40fr) minmax(0, 10fr) minmax(0, 5fr) minmax(0, 20fr) minmax(0, 25fr);
     background-color: #F46404;
