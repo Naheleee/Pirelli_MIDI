@@ -268,7 +268,7 @@ p {
 .square1 {
     position: relative;
     margin: 0;
-    padding: 2px;
+    padding: 0;
     width: auto;
     height: 100%;
     aspect-ratio: 1/1;
