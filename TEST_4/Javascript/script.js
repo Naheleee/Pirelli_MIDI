@@ -259,8 +259,8 @@ ablyClient.channels.get('keyboard').subscribe('midi', message => {
             if (request === fontChangeRequest) {
                 wrapper.style.fontFamily = `"${data.fontFamily}"`;
                 styleStatus.textContent = data.fontFamily === 'PirelliStencil'
-                    ? 'Style: Stencil'
-                    : 'Style: Regular';
+                    ? 'Stencil'
+                    : 'Regular';
             }
         });
     }

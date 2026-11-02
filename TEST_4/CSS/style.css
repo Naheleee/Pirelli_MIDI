@@ -2,7 +2,8 @@
     font-family: PirelliVar;
     src: url('../fonts/PirelliVar.woff2') format('woff2-variations');
     font-stretch: 100% 500%;
-    }
+}
+
 @font-face {
     font-family: PirelliStencil;
     src: url('../fonts/PirelliStencil.woff2') format('woff2');
@@ -72,7 +73,7 @@ body {
     display: flex;
     justify-content: flex-start;
     align-items: flex-start;
-    border: 1px solid white;
+
     border-bottom: none;
     color: #F46404;
     container-type: inline-size;
@@ -81,7 +82,7 @@ body {
 
 .titolo {
     font-family: "PirelliVar";
-    font-variation-settings: "wdth" 500;
+    font-variation-settings: "wdth"500;
     font-size: clamp(0.5rem, 15cqw, 9rem);
     line-height: 1;
     margin: 0;
@@ -99,7 +100,7 @@ body {
     display: flex;
     align-items: center;
     background-color: #1A1A1A;
-    border: 1px solid white;
+
     border-bottom: none;
     overflow: hidden;
 }
@@ -112,9 +113,9 @@ body {
     align-items: center;
     background-color: #F46404;
     background-image:
-        linear-gradient(to right, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px)),
-        linear-gradient(to bottom, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px));
-    background-size: 50% 100%, 100% 50%;
+        linear-gradient(to right, transparent calc(50% - 0.5px), #1A1A1A calc(50% - 0.5px), #1A1A1A calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+        linear-gradient(to bottom, transparent calc(50% - 0.5px), #1A1A1A calc(50% - 0.5px), #1A1A1A calc(50% + 0.5px), transparent calc(50% + 0.5px));
+    background-size: 100% 100%;
 }
 
 .glifo1 {
@@ -188,15 +189,18 @@ body {
     min-height: 0;
     border: 1px solid #F46404;
     color: #F46404;
-    font-size: clamp(0.4rem, 4cqw, 2rem);
-    font-variation-settings: "wdth" 100;
-    transition: font-variation-settings 320ms cubic-bezier(0.22, 1, 0.36, 1);
+    font-size: 2rem;
+    font-variation-settings: "wdth"100;
+    transition:
+        font-variation-settings 320ms cubic-bezier(0.22, 1, 0.36, 1),
+        font-size 320ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .looper-square.active {
     background-color: #F46404;
     color: #1A1A1A;
-    font-variation-settings: "wdth" 500;
+    font-variation-settings: "wdth"500;
+    font-size: 5rem;
 }
 
 .launchpad-visualizer {
@@ -246,6 +250,8 @@ body {
 }
 
 .section2 {
+    position: relative;
+    isolation: isolate;
     margin: 0;
     padding: 0;
     width: 40%;
@@ -253,20 +259,28 @@ body {
     min-width: 0;
     min-height: 0;
     background-color: #1A1A1A;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    overflow: hidden;
+}
+
+.section2::before {
+    position: absolute;
+    z-index: 0;
+    inset: 0;
     background-image:
         linear-gradient(to right, transparent calc(100% - 1px), #323232 calc(100% - 1px)),
         linear-gradient(to bottom, transparent calc(100% - 1px), #323232 calc(100% - 1px));
     background-size: 10% 100%, 100% 10%;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    border: 1px solid white;
-    border-left: none;
-    border-bottom: none;
-    overflow: hidden;
+    clip-path: inset(0 1px 1px 0);
+    content: "";
+    pointer-events: none;
 }
 
 .lettera {
+    position: relative;
+    z-index: 1;
     font-variation-settings: "wdth"500;
     font-size: clamp(1rem, 32cqw, 25rem);
     line-height: 1;
@@ -285,14 +299,40 @@ body {
     min-width: 0;
     min-height: 0;
     background-color: #F46404;
-    border: 1px solid white;
+
     display: flex;
     justify-content: space-between;
     align-items: center;
     overflow: hidden;
 }
 
-.font-info1,
+.font-info1 {
+    display: flex;
+    flex-direction: start;
+    padding-left: 15px;
+    gap: 4%;
+    align-items: left;
+    width: 100%;
+    min-width: 0;
+}
+
+.info-box {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 0px;
+}
+
+.info-title {
+    font-variation-settings: "wdth"500;
+    font-size: clamp(4px, 1.3cqw, 10px);
+}
+
+.info-data {
+    font-variation-settings: "wdth"500;
+    font-size: 3rem;
+}
+
 p {
     font-variation-settings: "wdth"500;
     font-size: clamp(5px, 3cqw, 1.7rem);
@@ -309,7 +349,7 @@ p {
     min-width: 0;
     min-height: 0;
     background-color: #1A1A1A;
-    border: 1px solid white;
+
     border-top: none;
     padding-left: clamp(2px, 0.5cqw, 0.5em);
     display: flex;
@@ -321,7 +361,7 @@ p {
 
 .font-info2 {
     font-variation-settings: "wdth"500;
-    font-size: clamp(5px, 3cqw, 1.7rem);
+    font-size: 3rem;
     margin: 0;
     padding: 0;
     color: #F46404;
@@ -332,27 +372,26 @@ p {
 }
 
 .box4 {
-    margin: 0;
-    padding: 0;
-    width: 100%;
+    margin: 20px 20px;
+    padding: 0px;
+    width: calc(100% - 40px);
     min-width: 0;
     min-height: 0;
     background-color: #F46404;
-    border: 1px solid white;
-    border-top: none;
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
     align-items: center;
+    border: 1px solid #1A1A1A;
 }
 
 .visualizers {
     margin: 0;
     padding: 0;
-    width: 60%;
+    width: auto;
     height: 100%;
     min-width: 0;
     min-height: 0;
-    flex: 0 0 60%;
+    flex: 1 1 0;
     display: grid;
     grid-template-rows: repeat(2, minmax(0, 1fr));
 }
@@ -383,21 +422,22 @@ p {
     display: grid;
     grid-template-columns: repeat(9, minmax(0, 1fr));
     background-color: #F46404;
-    border-bottom: 1px solid #1A1A1A;
+    border-left: 1px solid #1A1A1A;
 }
 
 .audio-visualizer-segment {
     min-width: 0;
     display: flex;
     align-items: flex-end;
-    justify-content: center;
+    justify-content: flex-start;
     padding-bottom: clamp(1px, 0.5cqw, 5px);
+    padding-left: clamp(1px, 0.5cqw, 5px);
     border-right: 1px solid #1A1A1A;
     color: #1A1A1A;
     font-size: clamp(4px, 1.3cqw, 10px);
-    font-variation-settings: "wdth" 500;
+    font-variation-settings: "wdth"500;
     line-height: 1.1;
-    text-align: center;
+    text-align: left;
     white-space: pre-line;
     overflow: hidden;
 }
@@ -417,9 +457,9 @@ p {
     flex: 0 0 auto;
     background-color: #F46404;
     background-image:
-        linear-gradient(to right, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px)),
-        linear-gradient(to bottom, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px));
-    background-size: 50% 100%, 100% 50%;
+        linear-gradient(to right, transparent calc(50% - 0.5px), #1A1A1A calc(50% - 0.5px), #1A1A1A calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+        linear-gradient(to bottom, transparent calc(50% - 0.5px), #1A1A1A calc(50% - 0.5px), #1A1A1A calc(50% + 0.5px), transparent calc(50% + 0.5px));
+    background-size: 100% 100%;
 }
 
 .square2 {
@@ -431,9 +471,9 @@ p {
     flex: 0 0 auto;
     background-color: #F46404;
     background-image:
-        linear-gradient(to right, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px)),
-        linear-gradient(to bottom, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px));
-    background-size: 50% 100%, 100% 50%;
+        linear-gradient(to right, transparent calc(50% - 0.5px), #1A1A1A calc(50% - 0.5px), #1A1A1A calc(50% + 0.5px), transparent calc(50% + 0.5px)),
+        linear-gradient(to bottom, transparent calc(50% - 0.5px), #1A1A1A calc(50% - 0.5px), #1A1A1A calc(50% + 0.5px), transparent calc(50% + 0.5px));
+    background-size: 100% 100%;
 }
 
 .square1::after,
@@ -442,7 +482,7 @@ p {
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 99%;
+    width: 100%;
     aspect-ratio: 1 / 1;
     border: 1px solid #1A1A1A;
     border-radius: 50%;
@@ -459,7 +499,7 @@ p {
     display: flex;
     justify-content: center;
     align-items: center;
-    border: 1px solid white;
+
     border-top: none;
     overflow: hidden;
 }
