@@ -439,9 +439,25 @@
       const keyboardSounds = Array.from({ length: 9 }, (_, index) => {
         return new Tone.Player().toDestination();
       });
-      const keyboardSoundsReady = Promise.all(keyboardSounds.map((sound, index) =>
-        sound.load(`SFX/acid_${index + 1}.mp3`)
-      ));
+      const keyboardSoundsReady = keyboardSounds.map(async (sound, index) => {
+        try {
+          const sampleUrl = new URL(
+            `SFX/2 cat eyes/cateyes_${index + 1}.wav`,
+            document.baseURI
+          );
+          const response = await fetch(sampleUrl);
+          if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+          }
+          sound.buffer = await Tone.context.decodeAudioData(
+            await response.arrayBuffer()
+          );
+          return true;
+        } catch (error) {
+          console.error(`Failed to load cateyes_${index + 1}.wav:`, error);
+          return false;
+        }
+      });
       Tone.Transport.bpm.value = 70;
       Tone.Transport.timeSignature = 4;
       Tone.Transport.loop = true;
@@ -483,15 +499,12 @@
         const request = ++keyboardSoundRequest;
         void (async () => {
           await Tone.start();
-          await keyboardSoundsReady;
-          if (request !== keyboardSoundRequest) return;
-
-          pendingSoundIndex = index;
           if (Tone.Transport.state !== 'started') Tone.Transport.start();
+          const isLoaded = await keyboardSoundsReady[index];
+          if (request !== keyboardSoundRequest || !isLoaded) return;
+          pendingSoundIndex = index;
         })().catch(error => {
-          if (request === keyboardSoundRequest) {
-            console.error('Failed to load or start keyboard sound:', error);
-          }
+          console.error('Failed to start keyboard audio:', error);
         });
       }
 
