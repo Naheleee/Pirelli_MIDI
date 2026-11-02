@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PirelliVar Studio - Variable Font Wave</title>
   <script src="https://cdn.jsdelivr.net/npm/webmidi@3.1.16/dist/iife/webmidi.iife.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
   <style>
     @font-face {
@@ -27,6 +28,50 @@
       place-items: center;
       overflow: hidden;
       background: #000;
+    }
+    #beat-display {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      z-index: 2;
+      display: grid;
+      gap: 8px;
+      width: min(240px, calc(100vw - 32px));
+      padding: 10px;
+      border: 1px solid #F46404;
+      background: rgba(0, 0, 0, 0.85);
+      color: #F46404;
+      font: 12px Arial, sans-serif;
+      letter-spacing: 0.08em;
+      transform: translateX(-50%);
+      user-select: none;
+    }
+    .beat-display-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+    .beat-display-tempo {
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .beat-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 6px;
+    }
+    .beat-square {
+      display: grid;
+      aspect-ratio: 1;
+      place-items: center;
+      border: 1px solid #F46404;
+      color: #F46404;
+      font-size: 16px;
+      transition: background-color 80ms linear, color 80ms linear;
+    }
+    .beat-square.active {
+      background: #F46404;
+      color: #1A1A1A;
     }
     #square {
       width: 100%;
@@ -55,6 +100,18 @@
   </style>
 </head>
 <body>
+  <aside id="beat-display" aria-label="Tempo and four-beat loop">
+    <div class="beat-display-info">
+      <span class="beat-display-tempo">70 BPM</span>
+      <span>LOOP <span id="loop-count">01</span></span>
+    </div>
+    <div class="beat-grid" role="group" aria-label="Loop beats">
+      <div class="beat-square active" aria-label="Beat 1">1</div>
+      <div class="beat-square" aria-label="Beat 2">2</div>
+      <div class="beat-square" aria-label="Beat 3">3</div>
+      <div class="beat-square" aria-label="Beat 4">4</div>
+    </div>
+  </aside>
   <main id="square">
     <div id="wrapper"></div>
   </main>
@@ -369,24 +426,86 @@
       }
 
       const keyboardNotes = new Map([
-        ['KeyA', 36], ['KeyS', 40], ['KeyD', 43],
-        ['KeyF', 47], ['KeyG', 50], ['KeyH', 53],
-        ['KeyJ', 57], ['KeyK', 60], ['KeyL', 64]
+        ['KeyA', { note: 36, sound: 0 }],
+        ['KeyS', { note: 40, sound: 1 }],
+        ['KeyD', { note: 43, sound: 2 }],
+        ['KeyF', { note: 47, sound: 3 }],
+        ['KeyG', { note: 50, sound: 4 }],
+        ['KeyH', { note: 53, sound: 5 }],
+        ['KeyJ', { note: 57, sound: 6 }],
+        ['KeyK', { note: 60, sound: 7 }],
+        ['KeyL', { note: 64, sound: 8 }]
       ]);
       const pressedKeyboardKeys = new Set();
+      const keyboardSounds = Array.from({ length: 9 }, (_, index) => {
+        return new Tone.Player().toDestination();
+      });
+      const keyboardSoundsReady = Promise.all(keyboardSounds.map((sound, index) =>
+        sound.load(`SFX/acid_${index + 1}.mp3`)
+      ));
+      Tone.Transport.bpm.value = 70;
+      Tone.Transport.timeSignature = 4;
+      Tone.Transport.loop = true;
+      Tone.Transport.loopStart = 0;
+      Tone.Transport.loopEnd = '1m';
+      const beatSquares = Array.from(
+        document.querySelectorAll('.beat-square')
+      );
+      const loopCountDisplay = document.getElementById('loop-count');
+      let transportBeatCount = 0;
+      Tone.Transport.scheduleRepeat(() => {
+        const beat = transportBeatCount % beatSquares.length;
+        const loop = Math.floor(transportBeatCount / beatSquares.length) + 1;
+        beatSquares.forEach((square, index) => {
+          square.classList.toggle('active', index === beat);
+        });
+        loopCountDisplay.textContent = String(loop).padStart(2, '0');
+        transportBeatCount++;
+      }, '4n');
+      let activeKeyboardSound = null;
+      let pendingSoundEvent = null;
+      let keyboardSoundRequest = 0;
+
+      function playKeyboardSound(index) {
+        if (pendingSoundEvent !== null) {
+          Tone.Transport.clear(pendingSoundEvent);
+          pendingSoundEvent = null;
+        }
+        const request = ++keyboardSoundRequest;
+        void (async () => {
+          await Tone.start();
+          await keyboardSoundsReady;
+          if (request !== keyboardSoundRequest) return;
+
+          if (Tone.Transport.state !== 'started') Tone.Transport.start();
+          const sound = keyboardSounds[index];
+          pendingSoundEvent = Tone.Transport.scheduleOnce(time => {
+            pendingSoundEvent = null;
+            if (request !== keyboardSoundRequest) return;
+            if (activeKeyboardSound) activeKeyboardSound.stop(time);
+            sound.start(time);
+            activeKeyboardSound = sound;
+          }, Tone.Transport.nextSubdivision('4n'));
+        })().catch(error => {
+          if (request === keyboardSoundRequest) {
+            console.error('Failed to schedule keyboard sound:', error);
+          }
+        });
+      }
 
       window.addEventListener('keydown', event => {
-        const note = keyboardNotes.get(event.code);
-        if (note === undefined || pressedKeyboardKeys.has(event.code)) return;
+        const key = keyboardNotes.get(event.code);
+        if (key === undefined || pressedKeyboardKeys.has(event.code)) return;
         event.preventDefault();
         pressedKeyboardKeys.add(event.code);
-        pressMidiNote(note);
+        playKeyboardSound(key.sound);
+        pressMidiNote(key.note);
       });
 
       function releaseKeyboardKey(code) {
-        const note = keyboardNotes.get(code);
-        if (note === undefined || !pressedKeyboardKeys.delete(code)) return;
-        releaseMidiNote(note);
+        const key = keyboardNotes.get(code);
+        if (key === undefined || !pressedKeyboardKeys.delete(code)) return;
+        releaseMidiNote(key.note);
       }
 
       window.addEventListener('keyup', event => {
