@@ -108,6 +108,8 @@ body {
     height: 100%;
     aspect-ratio: 1/1;
     flex: 0 0 auto;
+    justify-content: center;
+    align-items: center;
     background-color: #F46404;
     background-image:
         linear-gradient(to right, transparent calc(100% - 1px), #1A1A1A calc(100% - 1px)),
@@ -119,7 +121,7 @@ body {
     font-variation-settings: "wdth"500;
     font-size: clamp(0.5rem, 15cqw, 8rem);
     width: 100%;
-    line-height: 1;
+    line-height: 1.6;
     margin: 0;
     padding: 0;
     text-align: center;
@@ -459,5 +461,5 @@ p {
     flex: 0 0 auto;
     margin: 0;
     padding: 10px;
-    font-size: inherit;
+    font-size: 300px;
 }
