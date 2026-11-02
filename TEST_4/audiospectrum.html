@@ -37,7 +37,7 @@
             width: 100%;
             padding: clamp(1px, 5vmin, 2rem);
             box-sizing: border-box;
-            pointer-events: none; /* Let clicks pass through to canvas */
+            pointer-events: none; /* Let clicks pass through to the visualization */
             z-index: 10;
             display: flex;
             justify-content: space-between;
@@ -114,8 +114,7 @@
             text-align: center;
         }
 
-        /* The Canvas */
-        canvas {
+        #visualizer {
             display: block;
             position: absolute;
             inset: 0;
@@ -141,12 +140,16 @@
         </div>
     </div>
 
-    <!-- Visualization Canvas -->
-    <canvas id="visualizer"></canvas>
+    <!-- Vector audio visualization -->
+    <svg id="visualizer" aria-hidden="true">
+        <path id="waveform" fill="none" stroke="#f46404" stroke-linejoin="miter"></path>
+        <g id="waveform-vertices" fill="#f46404"></g>
+    </svg>
 
     <script>
-        const canvas = document.getElementById('visualizer');
-        const ctx = canvas.getContext('2d');
+        const visualizer = document.getElementById('visualizer');
+        const waveform = document.getElementById('waveform');
+        const verticesGroup = document.getElementById('waveform-vertices');
         const startBtn = document.getElementById('start-btn');
         const overlay = document.getElementById('overlay');
         const volEl = document.getElementById('vol-text');
@@ -161,16 +164,25 @@
         
         // Settings for the "low vertex" angular look
         const NUM_VERTICES = 16; // Very low point count across the whole width
-        const COLOR = '#f46404';
         const NOISE_GATE_THRESHOLD = 0.005; // Threshold for RMS to consider it "silence"
+        const vertices = Array.from({ length: NUM_VERTICES }, () => {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            verticesGroup.appendChild(circle);
+            return circle;
+        });
+        let visualizerWidth = 0;
+        let visualizerHeight = 0;
 
-        // Resize Canvas to fit its containing panel
+        // Resize the SVG coordinate system to fit its containing panel.
         function resize() {
-            const { width, height } = canvas.getBoundingClientRect();
-            const dpr = window.devicePixelRatio || 1;
-            canvas.width = Math.round(width * dpr);
-            canvas.height = Math.round(height * dpr);
-            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            const { width, height } = visualizer.getBoundingClientRect();
+            visualizerWidth = width;
+            visualizerHeight = height;
+            visualizer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            waveform.setAttribute('stroke-width', String(Math.max(1, Math.min(width, height) * 0.02)));
+            vertices.forEach(vertex => {
+                vertex.setAttribute('r', String(Math.max(1.5, Math.min(width, height) * 0.035)));
+            });
         }
         window.addEventListener('resize', resize);
         new ResizeObserver(resize).observe(document.body);
@@ -289,25 +301,11 @@
             dbEl.innerText = `${db.toFixed(1)} dBFS`;
 
             // 2. Draw the visualizer
-            const w = canvas.clientWidth;
-            const h = canvas.clientHeight;
-            
-            // Clear previous frame
-            ctx.clearRect(0, 0, w, h);
-
-            // Styling
-            const size = Math.min(w, h);
-            ctx.lineWidth = Math.max(1, size * 0.02);
-            ctx.strokeStyle = COLOR;
-            ctx.fillStyle = COLOR;
-            ctx.lineJoin = 'miter'; // Keeps corners sharp
-
+            const w = visualizerWidth;
+            const h = visualizerHeight;
             const sliceWidth = w / (NUM_VERTICES - 1);
             const step = Math.floor(dataArray.length / NUM_VERTICES);
-
-            ctx.beginPath();
-            
-            let points = []; // Store vertices so we can draw dots on them later
+            const points = [];
 
             for(let i = 0; i < NUM_VERTICES; i++) {
                 let dataIndex = i * step;
@@ -323,29 +321,20 @@
                     }
                 }
 
-                // Scale the amplitude smoothly to a max of ~85% of half the screen height 
-                // to prevent spikes from ever exceeding the top/bottom canvas bounds
+                // Keep waveform peaks within the top and bottom of the SVG.
                 let amplitude = maxDeviation * 0.85; 
                 let y = (h / 2) + (amplitude * (h / 2));
 
                 let x = i * sliceWidth;
                 points.push({x, y});
-
-                if(i === 0) {
-                    ctx.moveTo(x, y);
-                } else {
-                    ctx.lineTo(x, y);
-                }
             }
-            
-            ctx.stroke(); // Draw the continuous angular line
-
-            // Draw the dots at each vertex
-            for(let i = 0; i < points.length; i++) {
-                ctx.beginPath();
-                ctx.arc(points[i].x, points[i].y, Math.max(1.5, size * 0.035), 0, Math.PI * 2);
-                ctx.fill();
-            }
+            waveform.setAttribute('d', points
+                .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`)
+                .join(' '));
+            points.forEach((point, index) => {
+                vertices[index].setAttribute('cx', String(point.x));
+                vertices[index].setAttribute('cy', String(point.y));
+            });
         }
     </script>
 </body>

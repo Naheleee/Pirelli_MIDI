@@ -1,6 +1,23 @@
 const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
 const messageOutput = document.querySelector('.font-info2');
 const styleStatus = document.querySelector('.style-status');
+const messageTrack = document.createElement('span');
+messageTrack.className = 'font-info2-track';
+const messageHistory = document.createElement('span');
+messageHistory.className = 'font-info2-history';
+messageTrack.append(messageHistory);
+messageOutput.replaceChildren(messageTrack);
+
+const recentMessageTimes = [];
+
+messageTrack.addEventListener('transitionend', event => {
+    if (event.propertyName !== 'transform') return;
+    messageTrack.style.transition = 'none';
+    const outputRight = messageOutput.getBoundingClientRect().right;
+    Array.from(messageHistory.children).forEach(entry => {
+        if (entry.getBoundingClientRect().left >= outputRight) entry.remove();
+    });
+});
 
 function watchMidiDeviceStatus(channelName, statusElement) {
     const presence = ablyClient.channels.get(channelName).presence;
@@ -44,9 +61,50 @@ document.querySelectorAll('.midi-device-status').forEach(statusElement => {
 });
 
 function prependKeyMessage(message) {
-    messageOutput.textContent = messageOutput.textContent
-    ? `${message} / ${messageOutput.textContent}`
-    : message;
+    const hadPreviousMessages = messageHistory.childElementCount > 0;
+    const currentTransform = getComputedStyle(messageTrack).transform;
+    const currentOffset = currentTransform === 'none'
+        ? 0
+        : new DOMMatrixReadOnly(currentTransform).m41;
+
+    const entry = document.createElement('span');
+    entry.className = 'font-info2-entry';
+    const text = document.createElement('span');
+    text.textContent = message;
+    entry.append(text);
+    if (messageHistory.childElementCount > 0) {
+        const separator = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        separator.setAttribute('class', 'message-separator');
+        separator.setAttribute('viewBox', '0 0 10 10');
+        separator.setAttribute('aria-hidden', 'true');
+        const dot = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        dot.setAttribute('cx', '5');
+        dot.setAttribute('cy', '5');
+        dot.setAttribute('r', '5');
+        dot.setAttribute('fill', '#F46404');
+        separator.append(dot);
+        entry.append(separator);
+    }
+    messageHistory.prepend(entry);
+    const now = performance.now();
+    while (recentMessageTimes.length && now - recentMessageTimes[0] > 2500) {
+        recentMessageTimes.shift();
+    }
+    recentMessageTimes.push(now);
+    const duration = Math.max(160, 420 - Math.min(recentMessageTimes.length - 1, 8) * 32);
+
+    if (!hadPreviousMessages) {
+        messageTrack.style.transition = 'none';
+        messageTrack.style.transform = 'translate3d(0, 0, 0)';
+        return;
+    }
+
+    const entryWidth = entry.getBoundingClientRect().width;
+    messageTrack.style.transition = 'none';
+    messageTrack.style.transform = `translate3d(${currentOffset - entryWidth}px, 0, 0)`;
+    messageTrack.getBoundingClientRect();
+    messageTrack.style.transition = `transform ${duration}ms cubic-bezier(0.22, 1, 0.36, 1)`;
+    messageTrack.style.transform = 'translate3d(0, 0, 0)';
 }
 
 function formatKeyboardNote(note) {

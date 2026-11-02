@@ -49,6 +49,7 @@ body {
     min-width: 0;
     min-height: 0;
     display: flex;
+    background-color: #1A1A1A;
 }
 
 .section1 {
@@ -436,7 +437,7 @@ p {
     background-color: #1A1A1A;
 
     border-top: none;
-    padding-left: clamp(2px, 0.5cqw, 0.5em);
+    padding: 0 20px;
     display: flex;
     justify-content: flex-start;
     align-items: center;
@@ -454,6 +455,33 @@ p {
     overflow: hidden;
     white-space: nowrap;
     text-align: left;
+}
+
+.font-info2-track {
+    display: flex;
+    width: max-content;
+    white-space: nowrap;
+    will-change: transform;
+}
+
+.font-info2-history {
+    display: flex;
+    flex: 0 0 auto;
+    width: max-content;
+}
+
+.font-info2-entry {
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+}
+
+.message-separator {
+    display: inline-block;
+    width: 0.22em;
+    height: 0.22em;
+    margin: 0 0.50em;
+    vertical-align: 0.25em;
 }
 
 .box4 {
