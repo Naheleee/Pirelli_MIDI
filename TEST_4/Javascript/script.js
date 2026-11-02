@@ -69,6 +69,8 @@ const typeGuides = new Map(
 const guideContainer = document.querySelector('.type-guides');
 const widthValue = document.querySelector('.width-value');
 const widthValues = new Map();
+const title = document.querySelector('.titolo');
+const titleCell = title ? title.parentElement : null;
 const launchpadWidth = { firstPad: 81, lastPad: 88, min: 100, max: 500 };
 let currentFontWidth = launchpadWidth.max;
 let renderedFontWidth = currentFontWidth;
@@ -76,6 +78,29 @@ let widthAnimationFrame = null;
 const widthTransitionDuration = 620;
 letter.style.fontVariationSettings = `"wdth" ${currentFontWidth}`;
 widthStatus.textContent = String(currentFontWidth);
+
+function fitTitle() {
+    if (!title || !titleCell) return;
+    const cellStyles = getComputedStyle(titleCell);
+    const availableWidth = titleCell.clientWidth -
+        parseFloat(cellStyles.paddingLeft) - parseFloat(cellStyles.paddingRight);
+    const availableHeight = titleCell.clientHeight -
+        parseFloat(cellStyles.paddingTop) - parseFloat(cellStyles.paddingBottom);
+    if (availableWidth <= 0 || availableHeight <= 0) return;
+
+    let low = 1;
+    let high = availableHeight * 4;
+    for (let iteration = 0; iteration < 30; iteration++) {
+        const fontSize = (low + high) / 2;
+        title.style.fontSize = `${fontSize}px`;
+        const bounds = title.getBoundingClientRect();
+        if (bounds.width <= availableWidth && bounds.height <= availableHeight) low = fontSize;
+        else high = fontSize;
+    }
+    title.style.fontSize = `${low}px`;
+}
+
+fitTitle();
 const widthProbe = document.createElement('span');
 widthProbe.textContent = letter.textContent;
 widthProbe.setAttribute('aria-hidden', 'true');
@@ -229,11 +254,13 @@ function updateTypeGuides() {
 
 document.fonts.load('16px "PirelliVar"', 'AHx')
     .then(() => requestAnimationFrame(() => {
+        fitTitle();
         updateTypeGuides();
         updateWidthGuides(currentFontWidth);
     }))
     .catch(error => console.error('Failed to load Pirelli font metrics:', error));
 window.addEventListener('resize', () => {
+    fitTitle();
     updateTypeGuides();
     updateWidthGuides(renderedFontWidth);
 });
@@ -458,12 +485,16 @@ Promise.all([
 });
 let fontChangeRequest = 0;
 const looperSquares = Array.from(document.querySelectorAll('.looper-square'));
+const handTrackingGlyph = document.querySelector('.glifo1');
 let activeLooperBeat = 0;
 
 function advanceLooper() {
     looperSquares.forEach((square, index) => {
         square.classList.toggle('active', index === activeLooperBeat);
     });
+    if (handTrackingGlyph) {
+        handTrackingGlyph.style.fontFeatureSettings = `"ornm" ${activeLooperBeat + 1}`;
+    }
     activeLooperBeat = (activeLooperBeat + 1) % looperSquares.length;
 }
 

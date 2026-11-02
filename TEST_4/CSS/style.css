@@ -83,11 +83,17 @@ body {
 .titolo {
     font-family: "PirelliVar";
     font-variation-settings: "wdth"500;
-    font-size: clamp(0.5rem, 15cqw, 9rem);
-    line-height: 1;
+    flex: 0 0 auto;
+    width: max-content;
+    font-size: 1px;
+    line-height: 1.04;
     margin: 0;
     padding: 0;
     text-align: left;
+    white-space: nowrap;
+    max-width: none;
+    transform: translate(-0.04em, -0.1em);
+    transform-origin: top left;
     color: #F46404;
 }
 
@@ -116,19 +122,19 @@ body {
         linear-gradient(to right, transparent calc(50% - 0.5px), #1A1A1A calc(50% - 0.5px), #1A1A1A calc(50% + 0.5px), transparent calc(50% + 0.5px)),
         linear-gradient(to bottom, transparent calc(50% - 0.5px), #1A1A1A calc(50% - 0.5px), #1A1A1A calc(50% + 0.5px), transparent calc(50% + 0.5px));
     background-size: 100% 100%;
-    border-right: 1px solid #1A1A1A;
+    
 }
 
 .glifo1 {
     font-variation-settings: "wdth"500;
     font-size: clamp(0.5rem, 15cqw, 8rem);
     width: 100%;
-    line-height: 1.6;
+    line-height: 1.4;
     margin: 0;
     padding: 0;
     text-align: center;
     color: #1A1A1A;
-    font-feature-settings: 'ornm'2;
+    font-feature-settings: 'ornm'1;
 }
 
 .handtracking2 {
@@ -156,15 +162,18 @@ body {
 
 .looper {
     height: 100%;
-    aspect-ratio: 1 / 1;
+    aspect-ratio: 1 / 4;
     flex: 0 0 auto;
     display: grid;
     grid-template-areas:
-        "beat1 beat2"
-        "beat4 beat3";
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    grid-template-rows: repeat(2, minmax(0, 1fr));
+        "beat1"
+        "beat2"
+        "beat3"
+        "beat4";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(4, minmax(0, 1fr));
     background-color: #1A1A1A;
+    margin-right: 20px;
 }
 
 .looper-square:nth-child(1) {
@@ -188,20 +197,18 @@ body {
     place-items: center;
     min-width: 0;
     min-height: 0;
-    border: 1px solid #F46404;
-    color: #F46404;
-    font-size: 4rem;
-    font-variation-settings: "wdth"100;
-    transition:
-        font-variation-settings 320ms cubic-bezier(0.22, 1, 0.36, 1),
-        font-size 320ms cubic-bezier(0.22, 1, 0.36, 1);
+    border: 1px solid #777;
+    color: #999;
+    font-size: clamp(0.35rem, 1.25cqw, 1.25rem);
+    font-variation-settings: "wdth"500;
+  border-bottom:none;
+    line-height: 1;
+    white-space: nowrap;
 }
 
 .looper-square.active {
-    background-color: #F46404;
+    background-color: #777;
     color: #1A1A1A;
-    font-variation-settings: "wdth"500;
-    font-size: 5rem;
 }
 
 .launchpad-visualizer {
@@ -328,7 +335,7 @@ body {
 }
 
 .type-guide[data-metric="x-height"] span {
-    top: calc(3px + 1em);
+    top: 3px;
 }
 
 .type-guide[data-metric="typo-descender"] span {
