@@ -151,10 +151,13 @@
         const overlay = document.getElementById('overlay');
         const volEl = document.getElementById('vol-text');
         const dbEl = document.getElementById('db-text');
+        const instructions = document.querySelector('.instructions');
 
         let audioCtx;
         let analyser;
         let dataArray;
+        let stream;
+        let animationFrame;
         
         // Settings for the "low vertex" angular look
         const NUM_VERTICES = 16; // Very low point count across the whole width
@@ -175,47 +178,87 @@
 
         // Initialize Audio context and start drawing
         startBtn.addEventListener('click', async () => {
+            startBtn.disabled = true;
+            startBtn.textContent = 'WAITING FOR SCREEN SHARE';
+            instructions.textContent = 'Choose a screen or window and enable system audio to start.';
             try {
-                // Request Desktop Audio permissions
-                // Note: video: true is required by browsers to prompt for screen sharing
-                const stream = await navigator.mediaDevices.getDisplayMedia({ 
-                    video: true,
-                    audio: true 
-                });
-                
-                // We don't need the video track, so we can stop it if one was created
-                const videoTracks = stream.getVideoTracks();
-                if (videoTracks.length > 0) {
-                    // We let it run but we don't render it anywhere, just extracting audio.
+                const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextConstructor) {
+                    throw new Error('Web Audio is not supported in this browser.');
                 }
-                
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                if (!navigator.mediaDevices?.getDisplayMedia) {
+                    throw new Error('Screen audio capture is not supported in this browser or page context.');
+                }
+
+                const captureRequest = navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: true
+                });
+                audioCtx = new AudioContextConstructor();
+                stream = await captureRequest;
+                if (stream.getAudioTracks().length === 0) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                    throw new Error('No system audio was shared. Enable "Share system audio" and try again.');
+                }
+
                 const source = audioCtx.createMediaStreamSource(stream);
-                
                 analyser = audioCtx.createAnalyser();
-                analyser.fftSize = 1024; // Capture standard resolution
+                analyser.fftSize = 1024;
                 source.connect(analyser);
-                
                 dataArray = new Uint8Array(analyser.frequencyBinCount);
-                
-                // Hide button overlay
+
+                await audioCtx.resume();
+                stream.getTracks().forEach(track => {
+                    track.addEventListener('ended', stopCapture, { once: true });
+                });
+
                 overlay.style.opacity = '0';
                 setTimeout(() => { overlay.style.display = 'none'; }, 500);
-
-                // Start the animation loop
                 draw();
             } catch (err) {
                 console.error("Error accessing desktop audio:", err);
-                startBtn.innerText = "Audio Access Denied";
-                startBtn.style.pointerEvents = "none";
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
+                if (audioCtx && audioCtx.state !== 'closed') {
+                    await audioCtx.close();
+                }
+                audioCtx = null;
+                const message = err instanceof Error ? err.message : 'Audio capture failed. Check browser permissions and try again.';
+                instructions.textContent = message;
+                startBtn.textContent = 'TRY AGAIN';
+                startBtn.disabled = false;
             }
         });
 
+        function stopCapture() {
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            animationFrame = null;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            if (audioCtx && audioCtx.state !== 'closed') {
+                audioCtx.close();
+            }
+            audioCtx = null;
+            analyser = null;
+            dataArray = null;
+            overlay.style.display = 'flex';
+            overlay.style.opacity = '1';
+            startBtn.textContent = 'CAPTURE DESKTOP AUDIO';
+            startBtn.disabled = false;
+            instructions.textContent = 'Choose a screen or window and enable system audio to start.';
+        }
+
         // The main visualization loop
         function draw() {
-            requestAnimationFrame(draw);
+            animationFrame = requestAnimationFrame(draw);
 
             // Get time-domain data (waveform)
+            if (!analyser || !dataArray) return;
             analyser.getByteTimeDomainData(dataArray);
 
             // 1. Calculate Volume and DB metrics
