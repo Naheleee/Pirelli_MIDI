@@ -221,7 +221,7 @@ body {
     color: #999;
     font-size: clamp(0.35rem, 1.25cqw, 1.25rem);
     font-variation-settings: "wdth"500;
-  border-bottom:none;
+    border-bottom: none;
     line-height: 1;
     white-space: nowrap;
 }
@@ -327,7 +327,7 @@ body {
     border-top: 1px solid #777;
 }
 
-.type-guide > span {
+.type-guide>span {
     position: absolute;
     top: 3px;
     left: 0;
@@ -337,7 +337,7 @@ body {
     padding: 0 clamp(2px, 0.4cqw, 4px);
     color: #666;
     font-family: "PirelliVar", sans-serif;
-    font-variation-settings: "wdth" 500;
+    font-variation-settings: "wdth"500;
     font-size: clamp(4px, 1.3cqw, 10px);
     line-height: 1;
     white-space: nowrap;
@@ -369,7 +369,7 @@ body {
     left: var(--width-label-x, 0);
     padding: 0 2px;
     font-family: "PirelliVar", sans-serif;
-    font-variation-settings: "wdth" 500;
+    font-variation-settings: "wdth"500;
     font-size: clamp(4px, 1.3cqw, 10px);
     line-height: 1;
     white-space: nowrap;
@@ -386,7 +386,7 @@ body {
 .lettera {
     position: relative;
     z-index: 1;
-    font-variation-settings: "wdth" 500;
+    font-variation-settings: "wdth"500;
     font-size: clamp(1rem, 28cqw, 25rem);
     line-height: 1;
     width: 100%;
