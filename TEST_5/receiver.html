@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pirelli</title>
+    <link rel="stylesheet" href="CSS/style.css">
+    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <div class="box1">
+            <div class="section1">
+                <div class="cell1">
+                    <svg class="titolo" viewBox="0 0 1 1" preserveAspectRatio="xMinYMin meet"
+                        role="img" aria-label="PIRELLI">
+                        <text x="0" y="0" aria-hidden="true">PIRELLI</text>
+                    </svg>
+                </div>
+                <div class="cell2">
+                    <div class="handtracking1" aria-label="Hand tracking camera">
+                        <video class="handtracking-video" playsinline muted></video>
+                        <canvas class="handtracking-canvas" width="640" height="480"
+                            aria-label="Camera view showing tracked fingertips"></canvas>
+                        <p class="glifo1" aria-hidden="true">•</p>
+                    </div>
+                    <div class="launchpad-visualizer"></div>
+                    <div class="looper" aria-label="Four-beat looper">
+                        <div class="looper-square active" aria-label="1">1</div>
+                        <div class="looper-square" aria-label="Beat 2">2</div>
+                        <div class="looper-square" aria-label="Beat 3">3</div>
+                        <div class="looper-square" aria-label="Beat 4" style="border-bottom:1px solid #4B4B4B;">4</div>
+                    </div>
+                    <dl class="glyph-info-panel" aria-label="Current glyph encoding">
+                        <div class="glyph-info-row">
+                            <dt>Glyph Name</dt>
+                            <dd data-glyph-info="glyph-name"></dd>
+                        </div>
+                        <div class="glyph-info-row">
+                            <dt>Unicode Name</dt>
+                            <dd data-glyph-info="unicode-name"></dd>
+                        </div>
+                        <div class="glyph-info-row">
+                            <dt>Unicode Decimal</dt>
+                            <dd data-glyph-info="unicode-decimal"></dd>
+                        </div>
+                        <div class="glyph-info-row">
+                            <dt>Unicode Hex</dt>
+                            <dd data-glyph-info="unicode-hex"></dd>
+                        </div>
+                        <div class="glyph-info-row">
+                            <dt>HTML Entity</dt>
+                            <dd data-glyph-info="html-entity"></dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+            <div class="section2">
+                <div class="section2-frame">
+                    <div class="type-guides" aria-hidden="true">
+                        <div class="type-guide" data-metric="typo-ascender"><span><span class="guide-label">Typo ascender</span><span class="guide-value"></span></span></div>
+                        <div class="type-guide" data-metric="cap-height"><span><span class="guide-label">Cap height</span><span class="guide-value"></span></span></div>
+                        <div class="type-guide" data-metric="x-height"><span><span class="guide-label">X-height</span><span class="guide-value"></span></span></div>
+                        <div class="type-guide" data-metric="baseline"><span><span class="guide-label">Baseline</span><span class="guide-value"></span></span></div>
+                        <div class="type-guide" data-metric="typo-descender"><span><span class="guide-label">Typo descender</span><span class="guide-value"></span></span></div>
+                        <div class="width-guide width-guide-left"></div>
+                        <div class="width-guide width-guide-right"></div>
+                        <span class="width-value"></span>
+                    </div>
+                    <p class="lettera">A</p>
+                </div>
+            </div>
+        </div>
+        <div class="box2">
+            <div class="font-info1">
+                <div class="info-box">
+                    <p class="info-title">Width</p>
+                    <span class="info-data-frame">
+                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                            <path></path>
+                        </svg>
+                        <p class="info-data width-status">500</p>
+                    </span>
+                </div>
+                <div class="info-box">
+                    <p class="info-title">Style</p>
+                    <span class="info-data-frame">
+                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                            <path></path>
+                        </svg>
+                        <p class="info-data style-status">Regular</p>
+                    </span>
+                </div>
+                <div class="info-box">
+                    <p class="info-title">Keyboard</p>
+                    <span class="info-data-frame">
+                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                            <path></path>
+                        </svg>
+                        <p class="info-data midi-device-status" data-channel="keyboard">OFF</p>
+                    </span>
+                </div>
+                <div class="info-box">
+                    <p class="info-title">launchpad</p>
+                    <span class="info-data-frame">
+                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                            <path></path>
+                        </svg>
+                        <p class="info-data midi-device-status" data-channel="launchpad">OFF</p>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="box3">
+            <p class="font-info2"></p>
+        </div>
+        <div class="box4">
+            <div class="square1"></div>
+            <div class="visualizers">
+                <div class="audio-visualizer">
+                    <iframe src="audiospectrum.html" title="Audio spectrum visualizer"
+                        allow="display-capture *"></iframe>
+                </div>
+                <div class="note-visualizer"></div>
+            </div>
+            <div class="square2"></div>
+        </div>
+        <div class="letter-track" aria-hidden="true">
+            <span class="letter-track-line"></span>
+            <div class="letter-track-dots"></div>
+        </div>
+        <div class="box5">
+            <div class="lettere"></div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js"></script>
+    <script src="Javascript/handtracking.js"></script>
+    <script src="Javascript/script.js"></script>
+</body>
+</html>
