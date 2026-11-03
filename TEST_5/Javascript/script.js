@@ -1,4 +1,23 @@
-const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
+const ablyClient = new Ably.Realtime({
+    key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
+    clientId: `receiver-${Date.now()}-${Math.random().toString(36).slice(2)}`
+});
+const letterCycleChannel = ablyClient.channels.get('letter-cycle');
+const letterCyclePresence = letterCycleChannel.presence;
+const handTrackingChannel = ablyClient.channels.get('handtracking-vista2');
+let lastHandTrackingPublish = 0;
+let letterCycleLeaderId = null;
+let letterCycleElection = 0;
+let letterCycleInterval = null;
+
+window.addEventListener('handtracking-results', event => {
+    const now = performance.now();
+    if (now - lastHandTrackingPublish < 50) return;
+    lastHandTrackingPublish = now;
+    handTrackingChannel.publish('fingertips', event.detail).catch(error => {
+        console.error('Failed to publish hand tracking results:', error);
+    });
+});
 const infoFrameObserver = new ResizeObserver(entries => {
     entries.forEach(({ target }) => {
         const svg = target.querySelector('svg');
@@ -274,7 +293,12 @@ widthProbe.style.cssText =
     'position:fixed;left:-10000px;top:0;display:inline-block;visibility:hidden;white-space:pre;margin:0;padding:0;';
 document.body.appendChild(widthProbe);
 
-function setLetterWidth(width) {
+function setLetterWidth(
+    width,
+    startWidth = renderedFontWidth,
+    startAt = Date.now(),
+    duration = widthTransitionDuration
+) {
     const targetWidth = Math.round(Math.max(
         letterWidthRange.min,
         Math.min(letterWidthRange.max, width)
@@ -285,12 +309,11 @@ function setLetterWidth(width) {
 
     currentFontWidth = targetWidth;
     updateWidthStatus(targetWidth);
-    const startWidth = renderedFontWidth;
-    let startTime = null;
-
-    function animateWidth(time) {
-        if (startTime === null) startTime = time;
-        const progress = Math.min(1, (time - startTime) / widthTransitionDuration);
+    function animateWidth() {
+        const progress = Math.min(
+            1,
+            Math.max(0, (Date.now() - startAt) / duration)
+        );
         const easedProgress = easeWidthTransition(progress);
         renderedFontWidth = startWidth + (targetWidth - startWidth) * easedProgress;
         letter.style.fontVariationSettings = `"wdth" ${renderedFontWidth}`;
@@ -354,12 +377,18 @@ function updateWidthGuides(width) {
         });
     }
     widthValue.textContent = String(Math.round(width));
-    const valueWidth = widthValue.getBoundingClientRect().width;
-    const labelLeft = Math.min(
-        rightEdge + 4,
-        guidesBounds.width - valueWidth - 2
+    widthValue.style.setProperty('--width-label-x', `${glyphCenter}px`);
+    updateWidthLabelPosition();
+}
+
+function updateWidthLabelPosition() {
+    const baselineGuide = typeGuides.get('baseline');
+    const guideBounds = guideContainer.getBoundingClientRect();
+    const baselineLabels = baselineGuide.querySelector('span').getBoundingClientRect();
+    guideContainer.style.setProperty(
+        '--width-label-y',
+        `${baselineLabels.top - guideBounds.top}px`
     );
-    widthValue.style.setProperty('--width-label-x', `${Math.max(2, labelLeft)}px`);
 }
 
 function updateTypeGuides() {
@@ -403,10 +432,7 @@ function updateTypeGuides() {
         '--width-top',
         `${displayedPositions['typo-ascender']}px`
     );
-    guideContainer.style.setProperty(
-        '--width-label-y',
-        `${displayedPositions['typo-ascender'] + 3}px`
-    );
+    updateWidthLabelPosition();
     guideContainer.style.setProperty(
         '--width-height',
         `${displayedPositions['typo-descender'] - displayedPositions['typo-ascender']}px`
@@ -715,14 +741,89 @@ function advanceLooper() {
         handTrackingGlyph.style.fontFeatureSettings = `"ornm" ${activeLooperBeat + 1}`;
     }
     const beatWidth = looperWidths[activeLooperBeat] ?? letterWidthRange.min;
-    setLetterWidth(beatWidth);
+    const widthFrom = currentFontWidth;
+    const widthStartedAt = Date.now();
+    setLetterWidth(beatWidth, widthFrom, widthStartedAt, widthTransitionDuration);
+    letterCycleChannel.publish('letter', {
+        glyph: letter.textContent,
+        beat: activeLooperBeat + 1,
+        width: beatWidth,
+        widthFrom,
+        widthStartedAt,
+        widthDuration: widthTransitionDuration
+    }).catch(error => {
+        console.error('Failed to publish the current letter animation:', error);
+    });
     activeLooperBeat = (activeLooperBeat + 1) % looperSquares.length;
     looperHasStarted = true;
 }
 
+letterCycleChannel.subscribe('letter', message => {
+    if (
+        message.connectionId !== letterCycleLeaderId ||
+        message.connectionId === ablyClient.connection.id
+    ) return;
+
+    const { glyph, beat, width, widthFrom, widthStartedAt, widthDuration } = message.data ?? {};
+    if (
+        typeof glyph !== 'string' ||
+        Array.from(glyph).length !== 1 ||
+        !Number.isInteger(beat) ||
+        beat < 1 ||
+        beat > looperWidths.length ||
+        !Number.isFinite(width) ||
+        !Number.isFinite(widthFrom) ||
+        !Number.isFinite(widthStartedAt) ||
+        !Number.isFinite(widthDuration) ||
+        widthDuration <= 0
+    ) return;
+
+    letter.textContent = glyph;
+    updateGlyphInfo(glyph);
+    widthProbe.textContent = glyph;
+    updateWidthGuides(renderedFontWidth);
+    setLetterWidth(width, widthFrom, widthStartedAt, widthDuration);
+    activeLooperBeat = beat % looperWidths.length;
+    looperHasStarted = true;
+    looperSquares.forEach((square, index) => {
+        square.classList.toggle('active', index === beat - 1);
+    });
+});
+
+async function electLetterCycleLeader() {
+    const election = ++letterCycleElection;
+    try {
+        const members = await letterCyclePresence.get();
+        if (election !== letterCycleElection) return;
+        const receiverIds = Array.from(new Set(
+            members
+                .filter(member => member.data?.role === 'receiver')
+                .map(member => member.connectionId)
+        )).sort();
+        letterCycleLeaderId = receiverIds[0] ?? null;
+
+        if (letterCycleLeaderId === ablyClient.connection.id) {
+            if (letterCycleInterval === null && looperSquares.length > 0) {
+                advanceLooper();
+                letterCycleInterval = window.setInterval(advanceLooper, 60000 / 70);
+            }
+        } else if (letterCycleInterval !== null) {
+            window.clearInterval(letterCycleInterval);
+            letterCycleInterval = null;
+        }
+    } catch (error) {
+        console.error('Failed to elect the letter cycle source:', error);
+    }
+}
+
 if (looperSquares.length > 0) {
-    advanceLooper();
-    window.setInterval(advanceLooper, 60000 / 70);
+    letterCyclePresence.subscribe('enter', electLetterCycleLeader);
+    letterCyclePresence.subscribe('leave', electLetterCycleLeader);
+    letterCyclePresence.enter({ role: 'receiver' })
+        .then(electLetterCycleLeader)
+        .catch(error => {
+            console.error('Failed to join letter cycle presence:', error);
+        });
 }
 
 ablyClient.channels.get('keyboard').subscribe('midi', message => {

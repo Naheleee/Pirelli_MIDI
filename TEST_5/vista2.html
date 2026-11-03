@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pirelli</title>
+    <link rel="stylesheet" href="CSS/style.css">
+    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+    <style>
+        .container {
+            grid-template-rows: minmax(0, 1fr);
+        }
+
+        .section1 {
+            width: 100%;
+            grid-template-rows: minmax(0, 65fr) minmax(0, 35fr);
+        }
+
+        .cell1 {
+            padding: 2cqw;
+        }
+
+        .vista2-title {
+            --vista2-title-width: 100%;
+            --vista2-title-height: 100%;
+            --vista2-title-scale: 2.42;
+            --title-offset-x: -18px;
+            --title-offset-y: -31%;
+           font-variation-settings: "wdth" 150;
+            height: var(--vista2-title-height);
+            transform: translate(var(--title-offset-x), var(--title-offset-y)) scale(var(--vista2-title-scale));
+            transform-origin: top left;
+        }
+
+        .cell2 {
+            gap: 1cqw;
+            padding: 0 2cqw 2cqw;
+        }
+
+        .handtracking1,
+        .launchpad-visualizer {
+            height: 100%;
+        }
+
+        .launchpad-visualizer {
+            margin-left: -1cqw;
+        }
+
+        .looper {
+            margin: 0;
+        }
+
+        .looper-square {
+            font-size: clamp(10px, 2.2cqw, 28px);
+        }
+
+        .looper-square:last-child {
+            border-bottom: 1px solid #777;
+        }
+
+        .glyph-info-panel {
+            margin-left: -1cqw;
+            padding: 3px;
+        }
+
+        .glyph-info-row dt,
+        .glyph-info-row dd {
+            font-size: clamp(5px, 1.4cqw, 16px);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="box1">
+            <div class="section1">
+                <div class="cell1">
+                    <svg class="titolo vista2-title is-ready" viewBox="0 -45.7585 132.6521 57.1982"
+                        preserveAspectRatio="xMinYMin meet"
+                        role="img" aria-label="PIRELLI">
+                        <text x="0" y="0" aria-hidden="true">PIRELLI</text>
+                    </svg>
+                </div>
+                <div class="cell2">
+                    <div class="handtracking1" aria-label="Hand tracking camera">
+                        <video class="handtracking-video" playsinline muted></video>
+                        <canvas class="handtracking-canvas" width="640" height="480"
+                            aria-label="Camera view showing tracked fingertips"></canvas>
+                        <p class="glifo1" aria-hidden="true">•</p>
+                    </div>
+                    <div class="launchpad-visualizer" aria-label="Launchpad input visualizer"></div>
+                    <div class="looper" aria-label="Four-beat looper">
+                        <div class="looper-square active" aria-label="Beat 1">1</div>
+                        <div class="looper-square" aria-label="Beat 2">2</div>
+                        <div class="looper-square" aria-label="Beat 3">3</div>
+                        <div class="looper-square" aria-label="Beat 4">4</div>
+                    </div>
+                    <dl class="glyph-info-panel" aria-label="Current glyph encoding">
+                        <div class="glyph-info-row">
+                            <dt>Glyph Name</dt>
+                            <dd data-glyph-info="glyph-name">A</dd>
+                        </div>
+                        <div class="glyph-info-row">
+                            <dt>Unicode Name</dt>
+                            <dd data-glyph-info="unicode-name">Latin Capital Letter A</dd>
+                        </div>
+                        <div class="glyph-info-row">
+                            <dt>Unicode Decimal</dt>
+                            <dd data-glyph-info="unicode-decimal">65</dd>
+                        </div>
+                        <div class="glyph-info-row">
+                            <dt>Unicode Hex</dt>
+                            <dd data-glyph-info="unicode-hex">0041</dd>
+                        </div>
+                        <div class="glyph-info-row">
+                            <dt>HTML Entity</dt>
+                            <dd data-glyph-info="html-entity">&amp;#x41;</dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="Javascript/vista2.js"></script>
+</body>
+
+</html>

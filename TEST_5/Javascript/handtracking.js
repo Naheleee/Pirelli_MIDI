@@ -37,6 +37,17 @@ function showHandTrackingResults(results) {
     const detectedHands = results.multiHandLandmarks ?? [];
     detectedHands.forEach(drawFingertips);
     handTrackingContext.restore();
+
+    window.dispatchEvent(new CustomEvent('handtracking-results', {
+        detail: {
+            hands: detectedHands.map(landmarks =>
+                fingertipIndices.map(index => ({
+                    x: landmarks[index].x,
+                    y: landmarks[index].y
+                }))
+            )
+        }
+    }));
 }
 
 if (typeof Hands !== 'undefined' && typeof Camera !== 'undefined') {

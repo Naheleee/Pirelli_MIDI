@@ -402,8 +402,12 @@ body {
     width: 5px;
     height: 5px;
     border-radius: 50%;
-    background-color: #F46404;
+    background-color: #777;
     transform: translate(-50%, -50%);
+}
+
+.type-guide[data-metric="baseline"] .type-guide-dot {
+    background-color: #F46404;
 }
 
 .type-guide>span {
@@ -446,13 +450,15 @@ body {
     position: absolute;
     top: var(--width-label-y, 3px);
     left: var(--width-label-x, 0);
-    padding: 0 2px;
+    padding: 0;
+    background: transparent;
     color: #F46404;
     font-family: "PirelliVar", sans-serif;
     font-variation-settings: "wdth"500;
     font-size: clamp(4px, 1.3cqw, 10px);
     line-height: 1;
     white-space: nowrap;
+    transform: translateX(-50%);
 }
 
 .width-guide {
