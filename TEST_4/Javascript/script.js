@@ -20,6 +20,26 @@ const infoFrameObserver = new ResizeObserver(entries => {
 });
 document.querySelectorAll('.info-data-frame').forEach(frame => infoFrameObserver.observe(frame));
 
+const audioVisualizerFrame = document.querySelector('.audio-visualizer iframe');
+const audioReactiveCircles = document.querySelectorAll('.square1, .square2');
+window.addEventListener('message', event => {
+    const data = event.data;
+    if (
+        event.source !== audioVisualizerFrame.contentWindow ||
+        (event.origin !== window.location.origin &&
+            !(window.location.protocol === 'file:' && event.origin === 'null')) ||
+        data?.type !== 'audio-volume' ||
+        typeof data.level !== 'number' ||
+        !Number.isFinite(data.level)
+    ) return;
+
+    const level = Math.max(0, Math.min(1, data.level));
+    const scale = 1 + level / 7;
+    audioReactiveCircles.forEach(circle => {
+        circle.style.setProperty('--audio-scale', String(scale));
+    });
+});
+
 const messageOutput = document.querySelector('.font-info2');
 const styleStatus = document.querySelector('.style-status');
 const messageTrack = document.createElement('span');
@@ -151,10 +171,22 @@ const typeGuides = new Map(
         guide
     ])
 );
+const widthGuideDots = new Map(
+    Array.from(typeGuides, ([metric, guide]) => [
+        metric,
+        Array.from({ length: 2 }, () => {
+            const dot = document.createElement('i');
+            dot.className = 'type-guide-dot';
+            guide.appendChild(dot);
+            return dot;
+        })
+    ])
+);
 const guideContainer = document.querySelector('.type-guides');
 const widthValue = document.querySelector('.width-value');
 const title = document.querySelector('.titolo');
 const titleCell = title ? title.parentElement : null;
+let titleFontReady = false;
 const letterWidthRange = { min: 100, max: 500 };
 let currentFontWidth = letterWidthRange.max;
 let renderedFontWidth = currentFontWidth;
@@ -226,27 +258,15 @@ function updateGlyphInfo(glyph) {
 updateGlyphInfo(letter.textContent);
 
 function fitTitle() {
-    if (!title || !titleCell) return;
-    const cellStyles = getComputedStyle(titleCell);
-    const availableWidth = titleCell.clientWidth -
-        parseFloat(cellStyles.paddingLeft) - parseFloat(cellStyles.paddingRight);
-    const availableHeight = titleCell.clientHeight -
-        parseFloat(cellStyles.paddingTop) - parseFloat(cellStyles.paddingBottom);
-    if (availableWidth <= 0 || availableHeight <= 0) return;
+    if (!titleFontReady || !title || !titleCell) return;
+    const text = title.querySelector('text');
+    if (!text) return;
 
-    let low = 1;
-    let high = availableHeight * 4;
-    for (let iteration = 0; iteration < 30; iteration++) {
-        const fontSize = (low + high) / 2;
-        title.style.fontSize = `${fontSize}px`;
-        const bounds = title.getBoundingClientRect();
-        if (bounds.width <= availableWidth && bounds.height <= availableHeight) low = fontSize;
-        else high = fontSize;
-    }
-    title.style.fontSize = `${low}px`;
+    const { x, y, width, height } = text.getBBox();
+    if (width <= 0 || height <= 0) return;
+    title.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
 }
 
-fitTitle();
 const widthProbe = document.createElement('span');
 widthProbe.textContent = letter.textContent;
 widthProbe.setAttribute('aria-hidden', 'true');
@@ -328,6 +348,11 @@ function updateWidthGuides(width) {
     const rightEdge = glyphCenter + halfWidth;
     widthGuides[0].style.left = `${leftEdge}px`;
     widthGuides[1].style.left = `${rightEdge}px`;
+    for (const dots of widthGuideDots.values()) {
+        dots.forEach((dot, index) => {
+            dot.style.left = `${leftEdge + glyphWidth * index / (dots.length - 1)}px`;
+        });
+    }
     widthValue.textContent = String(Math.round(width));
     const valueWidth = widthValue.getBoundingClientRect().width;
     const labelLeft = Math.min(
@@ -389,14 +414,22 @@ function updateTypeGuides() {
 }
 
 document.fonts.load('16px "PirelliVar"', 'AHx')
-    .then(() => requestAnimationFrame(() => {
+    .then(() => {
+        titleFontReady = true;
         fitTitle();
-        updateTypeGuides();
-        updateWidthGuides(currentFontWidth);
-    }))
-    .catch(error => console.error('Failed to load Pirelli font metrics:', error));
+        title?.classList.add('is-ready');
+        requestAnimationFrame(() => {
+            updateTypeGuides();
+            updateWidthGuides(currentFontWidth);
+        });
+    })
+    .catch(error => {
+        console.error('Failed to load Pirelli font metrics:', error);
+        titleFontReady = true;
+        fitTitle();
+        title?.classList.add('is-ready');
+    });
 window.addEventListener('resize', () => {
-    fitTitle();
     fitText();
     updateTypeGuides();
     updateWidthGuides(renderedFontWidth);

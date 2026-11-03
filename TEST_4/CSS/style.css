@@ -67,11 +67,13 @@ body {
     margin: 0;
     padding: 20px;
     padding-top: 10px;
+    padding-bottom: 0;
     width: 100%;
     min-width: 0;
     min-height: 0;
     background-color: #1A1A1A;
     display: flex;
+    flex-direction: column;
     justify-content: flex-start;
     align-items: flex-start;
 
@@ -81,21 +83,31 @@ body {
     overflow: hidden;
 }
 
+
 .titolo {
+    --title-font-size: 48px;
+    --title-offset-x: -7px;
+    --title-offset-y: 5px;
+    visibility: hidden;
     font-family: "PirelliVar";
-    font-variation-settings: "wdth"500;
-    flex: 0 0 auto;
-    width: max-content;
-    font-size: 1px;
-    line-height: 1.04;
+    font-variation-settings: "wdth" 400;
+    flex: 1 1 auto;
+    display: block;
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+    font-size: var(--title-font-size);
     margin: 0;
     padding: 0;
-    text-align: left;
-    white-space: nowrap;
-    max-width: none;
-    transform: translate(-0.04em, -0.1em);
-    transform-origin: top left;
+    overflow: hidden;
+    fill: #F46404;
     color: #F46404;
+    transform: translate(var(--title-offset-x), var(--title-offset-y));
+}
+
+.titolo.is-ready {
+    visibility: visible;
 }
 
 .cell2 {
@@ -270,7 +282,7 @@ body {
     min-width: 0;
     overflow: hidden;
     margin: 0;
-     color: #ffffff37;
+     color: #777;
     font-variation-settings: inherit;
     font-size: clamp(4px, 1.3cqw, 10px);
     line-height: 1.1;
@@ -374,6 +386,26 @@ body {
     border-top: 1px solid #777;
 }
 
+.type-guide[data-metric="baseline"] {
+    border-top-color: #F46404;
+}
+
+.type-guide[data-metric="baseline"] .guide-label,
+.type-guide[data-metric="baseline"] .guide-value {
+    color: #F46404;
+}
+
+.type-guide-dot {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background-color: #F46404;
+    transform: translate(-50%, -50%);
+}
+
 .type-guide>span {
     position: absolute;
     top: 3px;
@@ -415,6 +447,7 @@ body {
     top: var(--width-label-y, 3px);
     left: var(--width-label-x, 0);
     padding: 0 2px;
+    color: #F46404;
     font-family: "PirelliVar", sans-serif;
     font-variation-settings: "wdth"500;
     font-size: clamp(4px, 1.3cqw, 10px);
@@ -695,6 +728,7 @@ p {
 .square2::after {
     content: "";
     position: absolute;
+    z-index: 0;
     top: 50%;
     left: 50%;
     width: 100%;
@@ -702,6 +736,21 @@ p {
     border: 1px solid #1A1A1A;
     border-radius: 50%;
     transform: translate(-50%, -50%);
+}
+
+.square1::before,
+.square2::before {
+    content: "";
+    position: absolute;
+    z-index: 1;
+    top: 50%;
+    left: 50%;
+    width: 70%;
+    aspect-ratio: 1 / 1;
+    box-sizing: border-box;
+    border: 1px solid #1A1A1A;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(var(--audio-scale, 1));
 }
 
 .letter-track {

@@ -161,6 +161,7 @@
         let dataArray;
         let stream;
         let animationFrame;
+        const parentOrigin = window.location.protocol === 'file:' ? '*' : window.location.origin;
         
         // Settings for the "low vertex" angular look
         const NUM_VERTICES = 16; // Very low point count across the whole width
@@ -248,6 +249,10 @@
         function stopCapture() {
             if (animationFrame) cancelAnimationFrame(animationFrame);
             animationFrame = null;
+            window.parent.postMessage(
+                { type: 'audio-volume', level: 0 },
+                parentOrigin
+            );
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 stream = null;
@@ -295,6 +300,10 @@
             // Convert RMS to a percentage (Multiplier tuned so normal loud music hits ~100%)
             let volumePercent = Math.round(rms * 250); 
             volumePercent = Math.min(100, Math.max(0, volumePercent));
+            window.parent.postMessage(
+                { type: 'audio-volume', level: volumePercent / 100 },
+                parentOrigin
+            );
 
             // Update HUD text independently
             volEl.innerText = `VOLUME ${volumePercent}%`;
