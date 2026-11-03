@@ -1,4 +1,25 @@
 const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
+const infoFrameObserver = new ResizeObserver(entries => {
+    entries.forEach(({ target }) => {
+        const svg = target.querySelector('svg');
+        const path = svg.querySelector('path');
+        const { width, height } = target.getBoundingClientRect();
+        if (!width || !height) return;
+
+        const inset = 0.5;
+        const cut = Math.min(6, (width - inset * 2) / 2, (height - inset * 2) / 2);
+        svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+        path.setAttribute(
+            'd',
+            `M ${inset + cut} ${inset} H ${width - inset - cut} ` +
+                `L ${width - inset} ${inset + cut} V ${height - inset - cut} ` +
+                `L ${width - inset - cut} ${height - inset} H ${inset + cut} ` +
+                `L ${inset} ${height - inset - cut} V ${inset + cut} Z`
+        );
+    });
+});
+document.querySelectorAll('.info-data-frame').forEach(frame => infoFrameObserver.observe(frame));
+
 const messageOutput = document.querySelector('.font-info2');
 const styleStatus = document.querySelector('.style-status');
 const messageTrack = document.createElement('span');
@@ -113,6 +134,12 @@ function formatKeyboardNote(note) {
 }
 
 const letter = document.querySelector('.lettera');
+const glyphInfoFields = new Map(
+    Array.from(document.querySelectorAll('[data-glyph-info]'), field => [
+        field.dataset.glyphInfo,
+        field
+    ])
+);
 const widthStatus = document.querySelector('.width-status');
 const widthGuides = [
     document.querySelector('.width-guide-left'),
@@ -126,16 +153,77 @@ const typeGuides = new Map(
 );
 const guideContainer = document.querySelector('.type-guides');
 const widthValue = document.querySelector('.width-value');
-const widthValues = new Map();
 const title = document.querySelector('.titolo');
 const titleCell = title ? title.parentElement : null;
-const launchpadWidth = { firstPad: 81, lastPad: 88, min: 100, max: 500 };
-let currentFontWidth = launchpadWidth.max;
+const letterWidthRange = { min: 100, max: 500 };
+let currentFontWidth = letterWidthRange.max;
 let renderedFontWidth = currentFontWidth;
 let widthAnimationFrame = null;
 const widthTransitionDuration = 620;
+const occasionalGlyphs = [...'@{©®ÆÜÝÿø#%!?Ω√€ńăÕ/'];
+const occasionalGlyphChance = 0.25;
+const specialUnicodeNames = new Map([
+    ['@', 'Commercial At'],
+    ['{', 'Left Curly Bracket'],
+    ['©', 'Copyright Sign'],
+    ['®', 'Registered Sign'],
+    ['Æ', 'Latin Capital Letter AE'],
+    ['Ü', 'Latin Capital Letter U With Diaeresis'],
+    ['Ý', 'Latin Capital Letter Y With Acute'],
+    ['ÿ', 'Latin Small Letter Y With Diaeresis'],
+    ['ø', 'Latin Small Letter O With Stroke'],
+    ['#', 'Number Sign'],
+    ['%', 'Percent Sign'],
+    ['!', 'Exclamation Mark'],
+    ['?', 'Question Mark'],
+    ['Ω', 'Ohm Sign'],
+    ['√', 'Square Root'],
+    ['€', 'Euro Sign'],
+    ['ń', 'Latin Small Letter N With Acute'],
+    ['ă', 'Latin Small Letter A With Breve'],
+    ['Õ', 'Latin Capital Letter O With Tilde'],
+    ['/', 'Solidus']
+]);
+const widthStatusProbe = document.createElement('span');
+widthStatusProbe.setAttribute('aria-hidden', 'true');
+widthStatusProbe.style.cssText =
+    'position:fixed;left:-10000px;top:0;display:inline-block;visibility:hidden;white-space:pre;margin:0;padding:0;';
+document.body.appendChild(widthStatusProbe);
+
+function updateWidthStatus(width) {
+    const text = String(width);
+    widthStatus.textContent = text;
+    const styles = getComputedStyle(widthStatus);
+    widthStatusProbe.style.fontFamily = styles.fontFamily;
+    widthStatusProbe.style.fontSize = styles.fontSize;
+    widthStatusProbe.style.fontWeight = styles.fontWeight;
+    widthStatusProbe.style.fontStyle = styles.fontStyle;
+    widthStatusProbe.style.fontVariationSettings = styles.fontVariationSettings;
+    widthStatusProbe.textContent = text;
+    widthStatus.style.width = `${widthStatusProbe.getBoundingClientRect().width}px`;
+}
+
 letter.style.fontVariationSettings = `"wdth" ${currentFontWidth}`;
-widthStatus.textContent = String(currentFontWidth);
+updateWidthStatus(currentFontWidth);
+
+function updateGlyphInfo(glyph) {
+    const codePoint = glyph.codePointAt(0);
+    if (codePoint === undefined) return;
+
+    glyphInfoFields.get('glyph-name').textContent = glyph;
+    glyphInfoFields.get('unicode-name').textContent =
+        codePoint >= 65 && codePoint <= 90
+            ? `Latin Capital Letter ${glyph}`
+            : specialUnicodeNames.get(glyph) ??
+                `Unicode Character U+${codePoint.toString(16).toUpperCase().padStart(4, '0')}`;
+    glyphInfoFields.get('unicode-decimal').textContent = String(codePoint);
+    glyphInfoFields.get('unicode-hex').textContent =
+        codePoint.toString(16).toUpperCase().padStart(4, '0');
+    glyphInfoFields.get('html-entity').textContent =
+        `&#x${codePoint.toString(16).toUpperCase()};`;
+}
+
+updateGlyphInfo(letter.textContent);
 
 function fitTitle() {
     if (!title || !titleCell) return;
@@ -166,27 +254,17 @@ widthProbe.style.cssText =
     'position:fixed;left:-10000px;top:0;display:inline-block;visibility:hidden;white-space:pre;margin:0;padding:0;';
 document.body.appendChild(widthProbe);
 
-for (let pad = launchpadWidth.firstPad; pad <= launchpadWidth.lastPad; pad++) {
-    const width = Math.round(
-        launchpadWidth.min +
-        (pad - launchpadWidth.firstPad) /
-            (launchpadWidth.lastPad - launchpadWidth.firstPad) *
-            (launchpadWidth.max - launchpadWidth.min)
-    );
-    widthValues.set(pad, width);
-}
-
 function setLetterWidth(width) {
-    const targetWidth = Math.max(
-        launchpadWidth.min,
-        Math.min(launchpadWidth.max, width)
-    );
+    const targetWidth = Math.round(Math.max(
+        letterWidthRange.min,
+        Math.min(letterWidthRange.max, width)
+    ));
     if (widthAnimationFrame !== null) {
         cancelAnimationFrame(widthAnimationFrame);
     }
 
     currentFontWidth = targetWidth;
-    widthStatus.textContent = String(targetWidth);
+    updateWidthStatus(targetWidth);
     const startWidth = renderedFontWidth;
     let startTime = null;
 
@@ -354,11 +432,7 @@ window.addEventListener('resize', () => {
         const pad = pads.get(data.id);
         if (!pad) return;
         pad.classList.toggle('active', data.isDown);
-        if (data.isDown) {
-            prependKeyMessage(`LP:"BTN${data.id}"`);
-            const width = widthValues.get(data.id);
-            if (width !== undefined) setLetterWidth(width);
-        }
+        if (data.isDown) prependKeyMessage(`LP:"BTN${data.id}"`);
     });
 })();
 
@@ -394,6 +468,31 @@ const spans = Array.from({ length: count }, () => {
     wrapper.appendChild(span);
     return span;
 });
+const letterTrack = document.querySelector('.letter-track');
+const letterTrackDots = document.querySelector('.letter-track-dots');
+const letterTrackMarkers = spans.map(() => {
+    const dot = document.createElement('span');
+    dot.className = 'letter-track-dot';
+    const value = document.createElement('span');
+    value.className = 'letter-track-value';
+    dot.appendChild(value);
+    letterTrackDots.appendChild(dot);
+    return dot;
+});
+
+function updateLetterTrackDots() {
+    if (!letterTrack || !letterTrackDots) return;
+    const markerLayer = letterTrackDots.getBoundingClientRect();
+    spans.forEach((span, index) => {
+        const bounds = span.getBoundingClientRect();
+        letterTrackMarkers[index].style.left = `${bounds.left + bounds.width / 2 - markerLayer.left}px`;
+        const widthValue = getComputedStyle(span).fontVariationSettings.match(/[\d.]+/);
+        letterTrackMarkers[index].firstElementChild.textContent = widthValue
+            ? String(Math.round(Number(widthValue[0])))
+            : '';
+    });
+}
+
 const easing = progress => 1 - (1 - progress) ** 3;
 
 function getWaveWidths(crest) {
@@ -455,6 +554,7 @@ function fitText() {
         span.style.fontVariationSettings = previousWidths[index];
     });
     wrapper.style.fontSize = `${fittedFontSize}px`;
+    updateLetterTrackDots();
 }
 
 let selectedGroup = count - 1;
@@ -477,6 +577,7 @@ function animateFrame(time) {
     const progress = Math.min(1, (time - animationStart) / CONFIG.transitionDurationMs);
     const eased = easing(progress);
     applyWidths(animationFrom.map((start, index) => start + (animationTo[index] - start) * eased));
+    updateLetterTrackDots();
     if (progress < 1) animationFrame = requestAnimationFrame(animateFrame);
     else animationFrame = null;
 }
@@ -544,21 +645,46 @@ Promise.all([
     if (pendingMidiNote !== null && activeMidiNote === pendingMidiNote) {
         animateGroup(getGroupIndex(pendingMidiNote));
     } else applyWidths(animationTo);
+    updateLetterTrackDots();
     pendingMidiNote = null;
 });
 let fontChangeRequest = 0;
 const looperSquares = Array.from(document.querySelectorAll('.looper-square'));
 const handTrackingGlyph = document.querySelector('.glifo1');
 let activeLooperBeat = 0;
+let looperHasStarted = false;
+let nextAlphabeticLetterCode = 'B'.charCodeAt(0);
+const looperWidths = [100, 250, 350, 500];
 
 function advanceLooper() {
+    if (looperHasStarted && activeLooperBeat === 0) {
+        const firstLetterCode = 'A'.charCodeAt(0);
+        const lastLetterCode = 'Z'.charCodeAt(0);
+        if (Math.random() < occasionalGlyphChance) {
+            letter.textContent = occasionalGlyphs[
+                Math.floor(Math.random() * occasionalGlyphs.length)
+            ];
+        } else {
+            letter.textContent = String.fromCharCode(nextAlphabeticLetterCode);
+            nextAlphabeticLetterCode = nextAlphabeticLetterCode >= lastLetterCode
+                ? firstLetterCode
+                : nextAlphabeticLetterCode + 1;
+        }
+        updateGlyphInfo(letter.textContent);
+        widthProbe.textContent = letter.textContent;
+        updateWidthGuides(renderedFontWidth);
+    }
+
     looperSquares.forEach((square, index) => {
         square.classList.toggle('active', index === activeLooperBeat);
     });
     if (handTrackingGlyph) {
         handTrackingGlyph.style.fontFeatureSettings = `"ornm" ${activeLooperBeat + 1}`;
     }
+    const beatWidth = looperWidths[activeLooperBeat] ?? letterWidthRange.min;
+    setLetterWidth(beatWidth);
     activeLooperBeat = (activeLooperBeat + 1) % looperSquares.length;
+    looperHasStarted = true;
 }
 
 if (looperSquares.length > 0) {
