@@ -23,8 +23,11 @@
                         <div class="looper-square" aria-label="Beat 3">3</div>
                         <div class="looper-square" aria-label="Beat 4" style="border-bottom:1px solid #777;">4</div>
                     </div>
-                    <div class="handtracking1">
-                        <p class="glifo1">•</p>
+                    <div class="handtracking1" aria-label="Hand tracking camera">
+                        <video class="handtracking-video" playsinline muted></video>
+                        <canvas class="handtracking-canvas" width="640" height="480"
+                            aria-label="Camera view showing tracked fingertips"></canvas>
+                        <p class="glifo1" aria-hidden="true">•</p>
                     </div>
                     <div class="launchpad-visualizer"></div>
                 </div>
@@ -83,7 +86,9 @@
             <div class="lettere"></div>
         </div>
     </div>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js"></script>
+    <script src="Javascript/handtracking.js"></script>
     <script src="Javascript/script.js"></script>
 </body>
-
 </html>
