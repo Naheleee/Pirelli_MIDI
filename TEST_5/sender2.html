@@ -519,7 +519,12 @@
         }
       }
 
-      function pressMidiNote(midi, midiKeyboard = false) {
+      function pressMidiNote(
+        midi,
+        midiKeyboard = false,
+        soundNotes = [midi],
+        source = 'computer'
+      ) {
         if (
           !Number.isInteger(midi) ||
           midi < firstMidiNote ||
@@ -527,7 +532,12 @@
         ){
           return;
         }
-        midiChannel.publish('midi', { type: 'noteon', note: midi });
+        midiChannel.publish('midi', {
+          type: 'noteon',
+          note: midi,
+          notes: soundNotes,
+          source
+        });
         if (!lettersReady || !whitePitchClasses.has(midi % 12)) return;
         const groupIndex = getGroupIndex(midi, midiKeyboard);
         if (groupIndex === null) return;
@@ -535,13 +545,17 @@
         showSelectedGroup();
       }
 
-      function releaseMidiNote(midi) {
+      function releaseMidiNote(midi, source = 'computer') {
         if (
           !Number.isInteger(midi) ||
           midi < firstMidiNote ||
           midi > lastMidiNote
         ) return;
-        midiChannel.publish('midi', { type: 'noteoff', note: midi });
+        midiChannel.publish('midi', {
+          type: 'noteoff',
+          note: midi,
+          source
+        });
       }
 
       const computerKeyCodes = [
@@ -994,7 +1008,7 @@
         const notes = midiKeyAssignments.get(midi);
         if (!notes) return;
         activeMidiInputNotes.set(midi, notes);
-        pressMidiNote(midi, true);
+        pressMidiNote(midi, true, notes, 'midi');
         try {
           await initializeBrassAudio();
           if (!activeMidiInputNotes.has(midi)) return;
@@ -1019,7 +1033,7 @@
             Tone.now()
           );
         }
-        releaseMidiNote(midi);
+        releaseMidiNote(midi, 'midi');
       }
 
       window.addEventListener('keyup', event => {

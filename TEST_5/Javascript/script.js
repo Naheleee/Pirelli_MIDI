@@ -1,4 +1,162 @@
 const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
+const receiverAudioControl = document.querySelector('.receiver-audio-control');
+const receiverAudioButton = document.querySelector('#receiver-audio-enable');
+const receiverAudioStatus = document.querySelector('#receiver-audio-status');
+const activeReceivedNotes = new Map();
+let receiverToneLoadPromise = null;
+let receiverAudioReady = null;
+let receiverBrassInstrument = null;
+
+function loadReceiverTone() {
+    if (window.Tone) return Promise.resolve();
+    if (receiverToneLoadPromise) return receiverToneLoadPromise;
+
+    receiverToneLoadPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js';
+        script.onload = () => resolve();
+        script.onerror = () => {
+            receiverToneLoadPromise = null;
+            reject(new Error('Failed to load Tone.js'));
+        };
+        document.head.appendChild(script);
+    });
+    return receiverToneLoadPromise;
+}
+
+function initializeReceiverAudio() {
+    if (receiverAudioReady) return receiverAudioReady;
+
+    receiverAudioReady = (async () => {
+        await loadReceiverTone();
+        await Tone.start();
+        await Tone.getContext().resume();
+
+        const masterFilter = new Tone.Filter({
+            type: 'lowpass',
+            frequency: 18000,
+            Q: 0.5,
+            rolloff: -24
+        });
+        const chorus = new Tone.Chorus({
+            frequency: 1.5,
+            delayTime: 3.5,
+            depth: 0.35,
+            wet: 1
+        }).start();
+        const reverb = new Tone.Reverb({
+            decay: 4.5,
+            preDelay: 0.015,
+            wet: 0
+        });
+        const delay = new Tone.FeedbackDelay({
+            delayTime: '8n',
+            feedback: 0.24,
+            wet: 0
+        });
+        const masterGain = new Tone.Gain(1);
+        masterFilter.connect(chorus);
+        chorus.connect(reverb);
+        reverb.connect(delay);
+        delay.connect(masterGain);
+        masterGain.toDestination();
+
+        receiverBrassInstrument = new Tone.PolySynth(Tone.FMSynth, {
+            harmonicity: 1.4,
+            modulationIndex: 4,
+            oscillator: { type: 'sawtooth' },
+            modulation: { type: 'square' },
+            modulationEnvelope: {
+                attack: 0.03,
+                decay: 0.25,
+                sustain: 0.4,
+                release: 0.45
+            },
+            envelope: {
+                attack: 1.089,
+                decay: 0.1,
+                sustain: 0.05,
+                release: 8
+            }
+        });
+        receiverBrassInstrument.connect(masterFilter);
+    })().catch(error => {
+        receiverAudioReady = null;
+        receiverAudioStatus.textContent = 'Audio could not start. Check browser audio permissions.';
+        console.error('Failed to initialize receiver brass audio:', error);
+        throw error;
+    });
+
+    return receiverAudioReady;
+}
+
+function midiNoteName(midi) {
+    const noteNames = [
+        'C', 'C#', 'D', 'D#', 'E', 'F',
+        'F#', 'G', 'G#', 'A', 'A#', 'B'
+    ];
+    return `${noteNames[midi % 12]}${Math.floor(midi / 12) - 1}`;
+}
+
+function startReceivedNote(record) {
+    if (!receiverBrassInstrument || record.started) return;
+    record.started = true;
+    receiverBrassInstrument.triggerAttack(
+        record.notes.map(midiNoteName),
+        Tone.now(),
+        0.85
+    );
+}
+
+function playReceivedNote(data) {
+    if (!Number.isInteger(data.note) || data.note < 0 || data.note > 127) return;
+    const source = data.source === 'midi' ? 'midi' : 'computer';
+    const id = `${source}:${data.note}`;
+    if (activeReceivedNotes.has(id)) return;
+
+    const notes = Array.isArray(data.notes) &&
+        data.notes.length > 0 &&
+        data.notes.length <= 16 &&
+        data.notes.every(note => Number.isInteger(note) && note >= 0 && note <= 127)
+        ? data.notes
+        : [data.note];
+    const record = { notes, started: false };
+    activeReceivedNotes.set(id, record);
+    startReceivedNote(record);
+}
+
+function releaseReceivedNote(data) {
+    if (!Number.isInteger(data.note) || data.note < 0 || data.note > 127) return;
+    const source = data.source === 'midi' ? 'midi' : 'computer';
+    const id = `${source}:${data.note}`;
+    const record = activeReceivedNotes.get(id);
+    if (!record) return;
+
+    activeReceivedNotes.delete(id);
+    if (record.started && receiverBrassInstrument) {
+        receiverBrassInstrument.triggerRelease(
+            record.notes.map(midiNoteName),
+            Tone.now()
+        );
+    }
+}
+
+if (receiverAudioButton && receiverAudioStatus) {
+    receiverAudioButton.addEventListener('click', async () => {
+        receiverAudioButton.disabled = true;
+        receiverAudioStatus.textContent = 'Starting Powerbrass audio...';
+        try {
+            await initializeReceiverAudio();
+            receiverAudioButton.textContent = 'Powerbrass audio enabled';
+            receiverAudioStatus.textContent = 'Playing received keys.';
+            activeReceivedNotes.forEach(startReceivedNote);
+            receiverAudioControl.hidden = true;
+        } catch (error) {
+            receiverAudioButton.disabled = false;
+        }
+    });
+}
+
 const infoFrameObserver = new ResizeObserver(entries => {
     entries.forEach(({ target }) => {
         const svg = target.querySelector('svg');
@@ -728,6 +886,7 @@ if (looperSquares.length > 0) {
 ablyClient.channels.get('keyboard').subscribe('midi', message => {
     const data = message.data;
     if (data?.type === 'noteon') {
+        playReceivedNote(data);
         if (
             Number.isInteger(data.note) &&
             data.note >= CONFIG.midiFirstNote &&
@@ -735,7 +894,10 @@ ablyClient.channels.get('keyboard').subscribe('midi', message => {
         ) prependKeyMessage(formatKeyboardNote(data.note));
         selectNote(data.note);
     }
-    if (data?.type === 'noteoff') releaseNote(data.note);
+    if (data?.type === 'noteoff') {
+        releaseReceivedNote(data);
+        releaseNote(data.note);
+    }
     if (
         data?.type === 'fontchange' &&
         ['PirelliVar', 'PirelliStencil'].includes(data.fontFamily)

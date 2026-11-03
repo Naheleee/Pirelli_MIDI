@@ -28,6 +28,43 @@ body {
     overflow: hidden;
 }
 
+.receiver-audio-control {
+    position: fixed;
+    z-index: 10;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: calc(100vw - 24px);
+    padding: 8px;
+    border: 1px solid #1A1A1A;
+    background: #F46404;
+    color: #1A1A1A;
+    font: 12px Arial, sans-serif;
+}
+
+.receiver-audio-control[hidden] {
+    display: none;
+}
+
+.receiver-audio-control button {
+    padding: 7px 10px;
+    border: 1px solid #1A1A1A;
+    background: #1A1A1A;
+    color: #F46404;
+    font: inherit;
+    cursor: pointer;
+}
+
+.receiver-audio-control button:disabled {
+    cursor: default;
+}
+
+#receiver-audio-status {
+    overflow-wrap: anywhere;
+}
+
 .container {
     margin: 0;
     padding: 0;
