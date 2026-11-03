@@ -445,7 +445,7 @@ const CONFIG = {
     maxFontWidth: 500,
     midiFirstNote: 36,
     midiLastNote: 65,
-    transitionDurationMs: 620
+    transitionDurationMs: 1000
 };
 const count = CONFIG.letterCount;
 const segmentNotes = [
