@@ -261,6 +261,8 @@
             const progressPercent = document.querySelector(".progress-percent");
             const audioEnableButton = document.querySelector(".audio-enable");
             const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            const isLocalFilePage = window.location.protocol === "file:";
+            const parentMessageTargetOrigin = isLocalFilePage ? "*" : window.location.origin;
             const totalCharacters = [...terminalLines].reduce((total, line) => total + line.dataset.text.length, 0);
             let completedCharacters = 0;
             let completedProgress = 0;
@@ -270,6 +272,29 @@
             let audioSources = [];
             let audioStarted = false;
             let audioStopScheduled = false;
+            let animationStarted = false;
+            let completionSent = false;
+            const notifyParentOfCompletion = () => {
+                if (completionSent) {
+                    return;
+                }
+
+                completionSent = true;
+                if (window.parent !== window) {
+                    window.parent.postMessage(
+                        { type: "loading-animation-complete" },
+                        parentMessageTargetOrigin
+                    );
+                }
+            };
+            const notifyParentOfStart = () => {
+                if (window.parent !== window) {
+                    window.parent.postMessage(
+                        { type: "loading-animation-started" },
+                        parentMessageTargetOrigin
+                    );
+                }
+            };
             const renderProgress = (percent) => {
                 const filled = Math.floor(percent / 5);
                 progressBar.textContent = "=".repeat(filled) + "-".repeat(20 - filled);
@@ -347,6 +372,12 @@
             };
 
             const startAnimation = () => {
+                if (animationStarted) {
+                    return;
+                }
+                animationStarted = true;
+                notifyParentOfStart();
+
                 if (reducedMotion) {
                     completedCharacters = totalCharacters;
                     completedProgress = 100;
@@ -359,6 +390,7 @@
                             progressLine.classList.add("is-visible");
                         }
                     });
+                    notifyParentOfCompletion();
                     return;
                 }
 
@@ -367,6 +399,7 @@
                 const typeLine = (lineIndex) => {
                     if (lineIndex >= terminalLines.length) {
                         stopAudioAfterFinish();
+                        notifyParentOfCompletion();
                         return;
                     }
 
@@ -426,6 +459,22 @@
                 typeLine(0);
             };
 
+            const startLoadingSequence = () => {
+                void startAudio().then(startAnimation);
+            };
+
+            window.addEventListener("message", (event) => {
+                if (
+                    event.source !== window.parent ||
+                    (event.origin !== window.location.origin && !(isLocalFilePage && event.origin === "null")) ||
+                    event.data?.type !== "start-loading-animation"
+                ) {
+                    return;
+                }
+                audioEnableButton.hidden = true;
+                startLoadingSequence();
+            });
+
             audioEnableButton.addEventListener("click", async () => {
                 audioEnableButton.disabled = true;
                 if (await startAudio()) {
@@ -433,7 +482,8 @@
                     startAnimation();
                     return;
                 }
-                audioEnableButton.disabled = false;
+                audioEnableButton.hidden = true;
+                startAnimation();
             });
         })();
     </script>

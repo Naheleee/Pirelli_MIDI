@@ -18,23 +18,43 @@
         }
 
         .cell1 {
-            padding: 2cqw;
+            padding: 0 2cqw 15px;
         }
 
         .vista2-title {
             --vista2-title-width: 100%;
             --vista2-title-height: 100%;
-            --vista2-title-scale: 2.42;
-            --title-offset-x: -18px;
-            --title-offset-y: -31%;
-           font-variation-settings: "wdth" 150;
+            font-variation-settings: "wdth" 150;
+            width: var(--vista2-title-width);
             height: var(--vista2-title-height);
-            transform: translate(var(--title-offset-x), var(--title-offset-y)) scale(var(--vista2-title-scale));
-            transform-origin: top left;
+            overflow: hidden;
+            transform: none;
+        }
+
+        .vista2-title tspan {
+            animation: vista2-width-wave 1.8s ease-in-out infinite;
+        }
+
+        .vista2-title tspan:nth-child(2) { animation-delay: 0.15s; }
+        .vista2-title tspan:nth-child(3) { animation-delay: 0.3s; }
+        .vista2-title tspan:nth-child(4) { animation-delay: 0.45s; }
+        .vista2-title tspan:nth-child(5) { animation-delay: 0.6s; }
+        .vista2-title tspan:nth-child(6) { animation-delay: 0.75s; }
+        .vista2-title tspan:nth-child(7) { animation-delay: 0.9s; }
+
+        @keyframes vista2-width-wave {
+            0%, 100% { font-variation-settings: "wdth" 100; }
+            50% { font-variation-settings: "wdth" 500; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .vista2-title tspan {
+                animation: none;
+            }
         }
 
         .cell2 {
-            gap: 1cqw;
+            gap:1cqw;
             padding: 0 2cqw 2cqw;
         }
 
@@ -45,10 +65,14 @@
 
         .launchpad-visualizer {
             margin-left: -1cqw;
+            
+              
         }
 
         .looper {
             margin: 0;
+            margin-left: -1cqw;
+            border-left:none;
         }
 
         .looper-square {
@@ -76,10 +100,10 @@
         <div class="box1">
             <div class="section1">
                 <div class="cell1">
-                    <svg class="titolo vista2-title is-ready" viewBox="0 -45.7585 132.6521 57.1982"
-                        preserveAspectRatio="xMinYMin meet"
+                    <svg class="titolo vista2-title is-ready" viewBox="0 -35.5 132.6521 35.5"
+                        preserveAspectRatio="none"
                         role="img" aria-label="PIRELLI">
-                        <text x="0" y="0" aria-hidden="true">PIRELLI</text>
+                        <text x="-2.5" y="0" text-anchor="start" textLength="137.15" lengthAdjust="spacingAndGlyphs" aria-hidden="true"><tspan>P</tspan><tspan>I</tspan><tspan>R</tspan><tspan>E</tspan><tspan>L</tspan><tspan>L</tspan><tspan>I</tspan></text>
                     </svg>
                 </div>
                 <div class="cell2">

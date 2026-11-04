@@ -23,6 +23,18 @@ window.addEventListener('handtracking-results', event => {
 const receiverAudioControl = document.querySelector('.receiver-audio-control');
 const receiverAudioButton = document.querySelector('#receiver-audio-enable');
 const receiverAudioStatus = document.querySelector('#receiver-audio-status');
+const loadingOverlay = document.querySelector('.loading-overlay');
+const loadingFrame = loadingOverlay.querySelector('iframe');
+const vistaOverlay = document.querySelector('.vista-overlay');
+const vistaFrame = vistaOverlay.querySelector('iframe');
+const isLocalFilePage = window.location.protocol === 'file:';
+const loadingMessageTargetOrigin = isLocalFilePage ? '*' : window.location.origin;
+const loadedScreenAudio = new Audio('SFX/Loaded.mp3');
+loadedScreenAudio.preload = 'auto';
+let loadingSequenceStarted = false;
+let loadingSequenceFinished = false;
+let loadingCompletionTimeout = null;
+let activeVista = null;
 const activeReceivedNotes = new Map();
 let receiverToneLoadPromise = null;
 let receiverAudioReady = null;
@@ -31,6 +43,111 @@ let receiverMasterFilter = null;
 let receiverChorus = null;
 let receiverReverb = null;
 let receiverDelay = null;
+
+function playLoadedScreenSound() {
+    loadedScreenAudio.currentTime = 0;
+    loadedScreenAudio.play().catch(error => {
+        if (error.name !== 'NotAllowedError') {
+            receiverAudioStatus.textContent = 'The screen sound could not play.';
+            console.error('Failed to play the receiver screen sound:', error);
+        }
+    });
+}
+
+function startLoadingSequence() {
+    vistaOverlay.hidden = true;
+    vistaOverlay.classList.remove('is-visible', 'is-ready');
+    vistaFrame.src = 'about:blank';
+    activeVista = null;
+
+    if (loadingCompletionTimeout !== null) {
+        window.clearTimeout(loadingCompletionTimeout);
+        loadingCompletionTimeout = null;
+    }
+
+    loadedScreenAudio.pause();
+    loadedScreenAudio.currentTime = 0;
+    loadingSequenceStarted = true;
+    loadingSequenceFinished = false;
+    loadingOverlay.classList.remove('is-ready', 'is-visible');
+    loadingOverlay.hidden = false;
+    loadingFrame.src = `loadingpage.html?run=${Date.now()}`;
+}
+
+function toggleVista(vista) {
+    if (loadingCompletionTimeout !== null) {
+        window.clearTimeout(loadingCompletionTimeout);
+        loadingCompletionTimeout = null;
+    }
+
+    loadingSequenceStarted = false;
+    loadingSequenceFinished = true;
+    loadingOverlay.hidden = true;
+    loadingOverlay.classList.remove('is-visible', 'is-ready');
+    loadingFrame.src = 'about:blank';
+
+    if (activeVista === vista) {
+        activeVista = null;
+        vistaOverlay.classList.remove('is-visible');
+        return;
+    }
+
+    activeVista = vista;
+    vistaOverlay.classList.remove('is-visible', 'is-ready');
+    vistaFrame.src = `vista${vista}.html?run=${Date.now()}`;
+    vistaOverlay.hidden = false;
+}
+
+loadingFrame.addEventListener('load', () => {
+    if (loadingSequenceStarted) {
+        loadingFrame.contentWindow.postMessage({ type: 'start-loading-animation' }, loadingMessageTargetOrigin);
+    }
+});
+
+vistaFrame.addEventListener('load', () => {
+    if (activeVista !== null && !vistaOverlay.hidden) {
+        vistaOverlay.classList.add('is-ready');
+        vistaOverlay.classList.add('is-visible');
+    }
+});
+
+vistaOverlay.addEventListener('transitionend', event => {
+    if (
+        event.target !== vistaOverlay ||
+        event.propertyName !== 'opacity' ||
+        vistaOverlay.classList.contains('is-visible') ||
+        activeVista !== null
+    ) return;
+
+    vistaOverlay.hidden = true;
+    vistaOverlay.classList.remove('is-ready');
+    vistaFrame.src = 'about:blank';
+});
+
+window.addEventListener('message', event => {
+    if (
+        event.source !== loadingFrame.contentWindow ||
+        !loadingSequenceStarted ||
+        (event.origin !== window.location.origin && !(isLocalFilePage && event.origin === 'null'))
+    ) return;
+
+    if (event.data?.type === 'loading-animation-started') {
+        loadingOverlay.classList.add('is-ready');
+        loadingOverlay.classList.add('is-visible');
+        return;
+    }
+    if (event.data?.type !== 'loading-animation-complete') return;
+
+    if (loadingSequenceFinished) return;
+    loadingSequenceFinished = true;
+
+    loadingCompletionTimeout = window.setTimeout(() => {
+        loadingOverlay.hidden = true;
+        loadingCompletionTimeout = null;
+        playLoadedScreenSound();
+    }, 2000);
+});
+
 const receiverSoundSettings = {
     filter: 18000,
     attack: 1.089,
@@ -710,7 +827,12 @@ window.addEventListener('resize', () => {
         const pad = pads.get(data.id);
         if (!pad) return;
         pad.classList.toggle('active', data.isDown);
-        if (data.isDown) prependKeyMessage(`LP:"BTN${data.id}"`);
+        if (data.isDown) {
+            prependKeyMessage(`LP:"BTN${data.id}"`);
+            if (data.id === 91) startLoadingSequence();
+            if (data.id === 92) toggleVista(1);
+            if (data.id === 93) toggleVista(2);
+        }
     });
 })();
 
@@ -746,6 +868,7 @@ const spans = Array.from({ length: count }, () => {
     wrapper.appendChild(span);
     return span;
 });
+const completionOverlay = document.querySelector('.completion-overlay');
 const letterTrack = document.querySelector('.letter-track');
 const letterTrackDots = document.querySelector('.letter-track-dots');
 const letterTrackMarkers = spans.map(() => {
@@ -857,7 +980,10 @@ function animateFrame(time) {
     applyWidths(animationFrom.map((start, index) => start + (animationTo[index] - start) * eased));
     updateLetterTrackDots();
     if (progress < 1) animationFrame = requestAnimationFrame(animateFrame);
-    else animationFrame = null;
+    else {
+        animationFrame = null;
+        completionOverlay.hidden = false;
+    }
 }
 
 const whitePitchClasses = new Set([0, 2, 4, 5, 7, 9, 11]);
@@ -885,6 +1011,7 @@ function setActiveSegment(group) {
 
 function animateGroup(group) {
     selectedGroup = group;
+    completionOverlay.hidden = true;
     if (animationFrame !== null) cancelAnimationFrame(animationFrame);
     animationFrom = spans.map(span => {
         const match = getComputedStyle(span).fontVariationSettings.match(/[\d.]+/);
