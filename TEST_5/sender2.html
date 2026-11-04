@@ -270,11 +270,15 @@
             CONFIG.elasticBounceStrength;
       }
     };
-    const spans = Array.from({ length: count }, () => {
+    const spans = Array.from({ length: count }, (_, index) => {
       const span = document.createElement('span');
       span.textContent = 'A';
       span.style.fontVariationSettings =
-        `'wdth' ${CONFIG.minFontWidth}`;
+        `'wdth' ${
+          CONFIG.minFontWidth +
+          (CONFIG.maxFontWidth - CONFIG.minFontWidth) *
+            index / (count - 1)
+        }`;
       wrapper.appendChild(span);
       return span;
     });
@@ -346,8 +350,6 @@
       spans.forEach((span, index) => {
         span.style.marginLeft =
           index === 0 ? '0px' : `${effectiveGap}px`;
-        span.style.fontVariationSettings =
-          `'wdth' ${CONFIG.minFontWidth}`;
       });
       let fittedFontSize = Infinity;
       for (const fontFamily of ['PirelliVar', 'PirelliStencil']) {
