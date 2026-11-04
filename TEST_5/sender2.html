@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="it">
 <head>
   <meta charset="UTF-8">
@@ -772,6 +772,19 @@
           }
           brassInstrument.set(settings);
         }
+        midiChannel.publish('sound-controls', {
+          filter: Number(soundControls.filter.value),
+          attack: Number(soundControls.attack.value),
+          release: Number(soundControls.release.value),
+          chorus: Number(soundControls.chorus.value),
+          reverb: Number(soundControls.reverb.value),
+          delay: Number(soundControls.delay.value),
+          resonance: Number(chipControls.resonance.value),
+          decay: Number(chipControls.decay.value),
+          sustain: Number(chipControls.sustain.value)
+        }).catch(error => {
+          console.error('Failed to publish sound control settings:', error);
+        });
       }
 
       function selectPreset(presetId, resetControls = true) {

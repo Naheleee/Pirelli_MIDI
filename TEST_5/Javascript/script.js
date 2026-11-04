@@ -5,6 +5,7 @@ const ablyClient = new Ably.Realtime({
 const letterCycleChannel = ablyClient.channels.get('letter-cycle');
 const letterCyclePresence = letterCycleChannel.presence;
 const handTrackingChannel = ablyClient.channels.get('handtracking-vista2');
+const keyboardChannel = ablyClient.channels.get('keyboard');
 let lastHandTrackingPublish = 0;
 let letterCycleLeaderId = null;
 let letterCycleElection = 0;
@@ -26,6 +27,65 @@ const activeReceivedNotes = new Map();
 let receiverToneLoadPromise = null;
 let receiverAudioReady = null;
 let receiverBrassInstrument = null;
+let receiverMasterFilter = null;
+let receiverChorus = null;
+let receiverReverb = null;
+let receiverDelay = null;
+const receiverSoundSettings = {
+    filter: 18000,
+    attack: 1.089,
+    release: 8,
+    chorus: 100,
+    reverb: 0,
+    delay: 0,
+    resonance: 0.5,
+    decay: 0.1,
+    sustain: 0.05
+};
+
+function applyReceiverSoundSettings(settings) {
+    if (receiverMasterFilter) {
+        receiverMasterFilter.frequency.value = settings.filter;
+        receiverMasterFilter.Q.value = settings.resonance;
+    }
+    if (receiverChorus) receiverChorus.wet.value = settings.chorus / 100;
+    if (receiverReverb) receiverReverb.wet.value = settings.reverb / 100;
+    if (receiverDelay) receiverDelay.wet.value = settings.delay / 100;
+    if (receiverBrassInstrument) {
+        receiverBrassInstrument.set({
+            envelope: {
+                attack: settings.attack,
+                decay: settings.decay,
+                sustain: settings.sustain,
+                release: settings.release
+            }
+        });
+    }
+}
+
+keyboardChannel.subscribe('sound-controls', message => {
+    const data = message.data;
+    if (!data || typeof data !== 'object') return;
+
+    const bounds = {
+        filter: [100, 18000],
+        attack: [0.001, 3],
+        release: [0.02, 8],
+        chorus: [0, 100],
+        reverb: [0, 100],
+        delay: [0, 100],
+        resonance: [0.5, 15],
+        decay: [0.02, 1],
+        sustain: [0, 1]
+    };
+    Object.entries(bounds).forEach(([key, [min, max]]) => {
+        const value = data[key];
+        if (typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max) {
+            receiverSoundSettings[key] = value;
+        }
+    });
+    applyReceiverSoundSettings(receiverSoundSettings);
+});
 
 function loadReceiverTone() {
     if (window.Tone) return Promise.resolve();
@@ -52,33 +112,33 @@ function initializeReceiverAudio() {
         await Tone.start();
         await Tone.getContext().resume();
 
-        const masterFilter = new Tone.Filter({
+        receiverMasterFilter = new Tone.Filter({
             type: 'lowpass',
-            frequency: 18000,
-            Q: 0.5,
+            frequency: receiverSoundSettings.filter,
+            Q: receiverSoundSettings.resonance,
             rolloff: -24
         });
-        const chorus = new Tone.Chorus({
+        receiverChorus = new Tone.Chorus({
             frequency: 1.5,
             delayTime: 3.5,
             depth: 0.35,
-            wet: 1
+            wet: receiverSoundSettings.chorus / 100
         }).start();
-        const reverb = new Tone.Reverb({
+        receiverReverb = new Tone.Reverb({
             decay: 4.5,
             preDelay: 0.015,
-            wet: 0
+            wet: receiverSoundSettings.reverb / 100
         });
-        const delay = new Tone.FeedbackDelay({
+        receiverDelay = new Tone.FeedbackDelay({
             delayTime: '8n',
             feedback: 0.24,
-            wet: 0
+            wet: receiverSoundSettings.delay / 100
         });
         const masterGain = new Tone.Gain(1);
-        masterFilter.connect(chorus);
-        chorus.connect(reverb);
-        reverb.connect(delay);
-        delay.connect(masterGain);
+        receiverMasterFilter.connect(receiverChorus);
+        receiverChorus.connect(receiverReverb);
+        receiverReverb.connect(receiverDelay);
+        receiverDelay.connect(masterGain);
         masterGain.toDestination();
 
         receiverBrassInstrument = new Tone.PolySynth(Tone.FMSynth, {
@@ -93,13 +153,13 @@ function initializeReceiverAudio() {
                 release: 0.45
             },
             envelope: {
-                attack: 1.089,
-                decay: 0.1,
-                sustain: 0.05,
-                release: 8
+                attack: receiverSoundSettings.attack,
+                decay: receiverSoundSettings.decay,
+                sustain: receiverSoundSettings.sustain,
+                release: receiverSoundSettings.release
             }
         });
-        receiverBrassInstrument.connect(masterFilter);
+        receiverBrassInstrument.connect(receiverMasterFilter);
     })().catch(error => {
         receiverAudioReady = null;
         receiverAudioStatus.textContent = 'Audio could not start. Check browser audio permissions.';
@@ -985,7 +1045,7 @@ if (looperSquares.length > 0) {
         });
 }
 
-ablyClient.channels.get('keyboard').subscribe('midi', message => {
+keyboardChannel.subscribe('midi', message => {
     const data = message.data;
     if (data?.type === 'noteon') {
         playReceivedNote(data);
