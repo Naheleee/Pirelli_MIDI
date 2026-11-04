@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pirelli</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="CSS/style.css">
+    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <style>
+        .container {
+            position: relative;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            grid-template-rows: auto;
+            column-gap: clamp(16px, 3cqw, 48px);
+            align-content: start;
+            background-color: #101010;
+            padding: 1cqw;
+        }
+
+        .loadingtext {
+            position: relative;
+            z-index: 1;
+            margin: 0;
+            font-size: clamp(10px, 2.2cqw, 28px);
+            text-align: left;
+            color: #ff6004;
+            line-height: 0.9;
+            font-family: "PirelliVar", sans-serif;
+        }
+
+        .terminal-cursor {
+            display: inline-block;
+            width: 0.4em;
+            height: 0.9em;
+            margin-left: 0.08em;
+            background-color: currentColor;
+            vertical-align: text-bottom;
+            transform: translateY(-2px);
+            animation: cursor-blink 0.8s steps(1, end) infinite;
+        }
+
+        .progress-line {
+            display: none;
+        }
+
+        .progress-line.is-visible {
+            display: inline;
+        }
+
+        .progress-bar {
+            white-space: pre;
+        }
+
+        .audio-enable {
+            position: fixed;
+            z-index: 2;
+            right: 12px;
+            bottom: 12px;
+            border: 1px solid #ff6004;
+            padding: 8px 12px;
+            background: #101010;
+            color: #ff6004;
+            font-family: "PirelliVar", sans-serif;
+            font-size: 16px;
+            font-variation-settings: "wdth" 500;
+            cursor: pointer;
+        }
+
+        .corner-cross,
+        .center-mark {
+            position: absolute;
+            pointer-events: none;
+        }
+
+        .corner-cross {
+            width: clamp(10px, 1.5cqw, 20px);
+            aspect-ratio: 1;
+        }
+
+        .corner-cross::before,
+        .corner-cross::after,
+        .center-mark::before,
+        .center-mark::after {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            content: "";
+            background-color: #ff6004;
+            transform: translate(-50%, -50%);
+        }
+
+        .corner-cross::before,
+        .corner-cross::after {
+            width: 1px;
+            height: 300%;
+        }
+
+        .corner-cross::before {
+            transform: translate(-50%, -50%) rotate(90deg);
+        }
+
+        .corner-cross--top-right {
+            top: 3cqw;
+            right: 3cqw;
+        }
+
+        .corner-cross--bottom-left {
+            bottom: 3cqw;
+            left: 3cqw;
+        }
+
+        .corner-cross--bottom-right {
+            right: 3cqw;
+            bottom: 3cqw;
+        }
+
+        .center-mark {
+            top: 50%;
+            left: 50%;
+            width: clamp(40px, 8cqw, 140px);
+            height: clamp(40px, 8cqw, 140px);
+            aspect-ratio: 1;
+            border: 1px solid #ff6004;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            animation:
+                circle-flicker 1.1s steps(1, end) infinite,
+                circle-resize 6.7s steps(1, end) infinite;
+        }
+
+        .center-mark::before,
+        .center-mark::after {
+            width: 100%;
+            height: 1px;
+            animation:
+                center-cross-flicker 0.9s steps(1, end) infinite,
+                center-cross-resize 5.3s steps(1, end) infinite;
+        }
+
+        .center-mark::before {
+            transform: translate(-50%, -50%);
+        }
+
+        .center-mark::after {
+            transform: translate(-50%, -50%) rotate(90deg);
+            animation:
+                center-cross-flicker 0.9s steps(1, end) infinite,
+                center-cross-resize 5.3s steps(1, end) infinite;
+        }
+
+        @keyframes circle-flicker {
+            0%, 13%, 17%, 19%, 52%, 57%, 100% {
+                border-color: #ff6004;
+            }
+
+            14%, 15%, 53%, 55%, 78%, 80% {
+                border-color: rgba(255, 96, 4, 0.2);
+            }
+
+            16%, 56%, 79% {
+                border-color: rgba(255, 96, 4, 0.65);
+            }
+        }
+
+        @keyframes center-cross-flicker {
+            0%, 28%, 32%, 61%, 66%, 68%, 100% {
+                opacity: 1;
+            }
+
+            29%, 30%, 62%, 64%, 91%, 93% {
+                opacity: 0.2;
+            }
+
+            31%, 65%, 92% {
+                opacity: 0.65;
+            }
+        }
+
+        @keyframes circle-resize {
+            0%, 8%, 12%, 31%, 35%, 58%, 63%, 88%, 92%, 100% {
+                width: clamp(40px, 8cqw, 140px);
+                height: clamp(40px, 8cqw, 140px);
+            }
+
+            9%, 11%, 59%, 62% {
+                width: clamp(26px, 5cqw, 88px);
+                height: clamp(26px, 5cqw, 88px);
+            }
+
+            32%, 34%, 89%, 91% {
+                width: clamp(58px, 11.5cqw, 200px);
+                height: clamp(58px, 11.5cqw, 200px);
+            }
+        }
+
+        @keyframes center-cross-resize {
+            0%, 18%, 22%, 49%, 53%, 77%, 81%, 100% {
+                width: 100%;
+            }
+
+            19%, 21%, 78%, 80% {
+                width: 52%;
+            }
+
+            50%, 52% {
+                width: 148%;
+            }
+        }
+
+        @keyframes cursor-blink {
+            50% {
+                opacity: 0;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .center-mark,
+            .center-mark::before,
+            .center-mark::after {
+                animation: none;
+            }
+
+            .terminal-cursor {
+                animation: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <span class="corner-cross corner-cross--top-right" aria-hidden="true"></span>
+        <span class="corner-cross corner-cross--bottom-left" aria-hidden="true"></span>
+        <span class="corner-cross corner-cross--bottom-right" aria-hidden="true"></span>
+        <span class="center-mark" aria-hidden="true"></span>
+        <p class="loadingtext">
+            <span class="terminal-line" data-text="$ pirelli pull --specimen performance"></span><br>
+            <span class="terminal-line" data-text="Connecting to fonts.pirelli.com... 200 OK"></span><br>
+            <span class="terminal-line" data-text="Downloading Pirelli-Performance.otf" data-reveal-progress></span><br>
+            <span class="progress-line">[<span class="progress-bar"></span>] <span class="progress-percent">0%</span></span><br>
+            <span class="terminal-line" data-text="Checksum: e3b0c442... [valid]"></span><br>
+            <span class="terminal-line" data-text="Saved: ~/.local/share/fonts/Pirelli-Performance.otf"></span><br>
+            <span class="terminal-line" data-text="Done."></span>
+        </p>
+
+        <p class="loadingtext">
+            <span class="terminal-line" data-text="Riccardo Vosti"></span><br>
+            <span class="terminal-line" data-text="Nahele Belli"></span>
+        </p>
+    </div>
+    <button class="audio-enable" type="button">Enable audio</button>
+    <script>
+        (() => {
+            const terminalLines = document.querySelectorAll(".terminal-line");
+            const progressLine = document.querySelector(".progress-line");
+            const progressBar = document.querySelector(".progress-bar");
+            const progressPercent = document.querySelector(".progress-percent");
+            const audioEnableButton = document.querySelector(".audio-enable");
+            const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            const totalCharacters = [...terminalLines].reduce((total, line) => total + line.dataset.text.length, 0);
+            let completedCharacters = 0;
+            let completedProgress = 0;
+            let audioGain;
+            let audioLevel;
+            let frequencySignal;
+            let audioSources = [];
+            let audioStarted = false;
+            let audioStopScheduled = false;
+            const renderProgress = (percent) => {
+                const filled = Math.floor(percent / 5);
+                progressBar.textContent = "=".repeat(filled) + "-".repeat(20 - filled);
+                progressPercent.textContent = `${percent}%`;
+            };
+            const updateAudioSignals = () => {
+                if (!audioLevel || !frequencySignal) {
+                    return;
+                }
+
+                const progress = (completedCharacters + completedProgress) / (totalCharacters + 100);
+                audioLevel.rampTo(0.1 + 0.9 * progress, 0.04);
+                frequencySignal.rampTo(progress * 0.3, 0.04);
+            };
+            const stopAudioAfterFinish = () => {
+                if (audioStopScheduled || !audioSources.length) {
+                    return;
+                }
+
+                audioStopScheduled = true;
+                const stopTime = Tone.now();
+                audioSources.forEach((source) => source.stop(stopTime));
+            };
+            const startAudio = async () => {
+                if (audioStarted) {
+                    return true;
+                }
+
+                if (typeof Tone === "undefined") {
+                    console.error("Tone.js could not be loaded; loading-page audio is unavailable.");
+                    return false;
+                }
+
+                try {
+                    await Tone.start();
+                    const progress = (completedCharacters + completedProgress) / (totalCharacters + 100);
+                    audioGain = new Tone.Gain(1).toDestination();
+                    audioLevel = new Tone.Signal(0.1 + 0.9 * progress);
+                    audioLevel.connect(audioGain.gain);
+
+                    const merge = new Tone.Merge().connect(audioGain);
+                    const rightOscillator = new Tone.Oscillator({
+                        type: "sawtooth",
+                        volume: -20
+                    }).connect(merge, 0, 0);
+                    const leftOscillator = new Tone.Oscillator({
+                        type: "square",
+                        volume: -20
+                    }).connect(merge, 0, 1);
+                    const detuneLFO = new Tone.LFO({
+                        type: "square",
+                        min: 0,
+                        max: 1200
+                    }).fan(rightOscillator.detune, leftOscillator.detune);
+
+                    frequencySignal = new Tone.Signal(progress * 0.3);
+                    const scale = new Tone.ScaleExp(110, 440);
+                    const multiply = new Tone.Multiply(2.5);
+                    frequencySignal.chain(scale, multiply);
+                    scale.connect(rightOscillator.frequency);
+                    multiply.connect(leftOscillator.frequency);
+
+                    const detuneScale = new Tone.Scale(14, 4);
+                    frequencySignal.chain(detuneScale, detuneLFO.frequency);
+
+                    audioSources = [detuneLFO, rightOscillator, leftOscillator];
+                    detuneLFO.start();
+                    [rightOscillator, leftOscillator].forEach((oscillator) => oscillator.start());
+                    audioStarted = true;
+                    return true;
+                } catch (error) {
+                    console.error("Could not start loading-page audio.", error);
+                    return false;
+                }
+            };
+
+            const startAnimation = () => {
+                if (reducedMotion) {
+                    completedCharacters = totalCharacters;
+                    completedProgress = 100;
+                    updateAudioSignals();
+                    stopAudioAfterFinish();
+                    terminalLines.forEach((line) => {
+                        line.textContent = line.dataset.text;
+                        if (line.hasAttribute("data-reveal-progress")) {
+                            renderProgress(100);
+                            progressLine.classList.add("is-visible");
+                        }
+                    });
+                    return;
+                }
+
+                let currentCursor;
+
+                const typeLine = (lineIndex) => {
+                    if (lineIndex >= terminalLines.length) {
+                        stopAudioAfterFinish();
+                        return;
+                    }
+
+                    if (currentCursor) {
+                        currentCursor.remove();
+                    }
+
+                    const line = terminalLines[lineIndex];
+                    const text = line.dataset.text;
+                    let characterIndex = 0;
+
+                    const typeCharacter = () => {
+                        line.textContent = text.slice(0, characterIndex);
+                        completedCharacters = [...terminalLines]
+                            .slice(0, lineIndex)
+                            .reduce((total, previousLine) => total + previousLine.dataset.text.length, characterIndex);
+                        updateAudioSignals();
+                        currentCursor = document.createElement("span");
+                        currentCursor.className = "terminal-cursor";
+                        currentCursor.setAttribute("aria-hidden", "true");
+                        line.append(currentCursor);
+
+                        if (characterIndex < text.length) {
+                            characterIndex += 1;
+                            window.setTimeout(typeCharacter, 18);
+                            return;
+                        }
+
+                        if (line.hasAttribute("data-reveal-progress")) {
+                            progressLine.classList.add("is-visible");
+                            let percent = 0;
+                            const updateProgress = () => {
+                                renderProgress(percent);
+                                completedProgress = percent;
+                                updateAudioSignals();
+                                if (percent < 100) {
+                                    percent += 1;
+                                    window.setTimeout(updateProgress, 35);
+                                } else {
+                                    window.setTimeout(() => typeLine(lineIndex + 1), 120);
+                                }
+                            };
+                            updateProgress();
+                            return;
+                        }
+
+                        if (lineIndex === terminalLines.length - 1) {
+                            typeLine(lineIndex + 1);
+                        } else {
+                            window.setTimeout(() => typeLine(lineIndex + 1), 120);
+                        }
+                    };
+
+                    typeCharacter();
+                };
+
+                typeLine(0);
+            };
+
+            audioEnableButton.addEventListener("click", async () => {
+                audioEnableButton.disabled = true;
+                if (await startAudio()) {
+                    audioEnableButton.hidden = true;
+                    startAnimation();
+                    return;
+                }
+                audioEnableButton.disabled = false;
+            });
+        })();
+    </script>
+</body>
+
+</html>

@@ -251,9 +251,6 @@
                     <option value="techno" class="bg-chassis-950">Minimal Techno</option>
                     <option value="noise" class="bg-chassis-950">Industrial Noise</option>
                 </select>
-                <button onclick="saveKeyframePreset()" title="Save this button's animation as a keyframe preset" aria-label="Save keyframe preset" class="ml-1 p-1 text-chassis-300 hover:text-chassis-100 hover:bg-chassis-800 rounded-sm transition">
-                    <i data-lucide="list-plus" class="w-3.5 h-3.5"></i>
-                </button>
             </div>
 
             <div class="flex items-center gap-2 bg-chassis-950 px-2 py-0.5 border border-chassis-800 rounded-sm">
@@ -519,7 +516,6 @@
                             <option value="7">7. Spiral Vortex</option>
                             <option value="8">8. Full Grid Flash</option>
                         </select>
-                        <button onclick="playSelectedPad()" title="Play the selected pad sound and animation" class="mt-1 flex w-full items-center justify-center gap-1 bg-chassis-800 hover:bg-chassis-700 border border-chassis-700 py-1 text-chassis-100 rounded-sm transition"><i data-lucide="play" class="w-3 h-3"></i> PLAY PAD + ANIMATION</button>
                     </div>
 
                     <div>
@@ -528,6 +524,10 @@
                             <input id="edit-anim-time" type="number" min="30" max="1000" step="10" value="120" onchange="updatePadConfigFromUI()" class="w-full bg-chassis-950 text-chassis-200 border border-chassis-800 p-1.5 outline-none rounded-sm">
                             <span class="text-chassis-500 text-[9px]">MS</span>
                         </div>
+                        <label class="mt-2 flex items-center gap-1.5 text-[9px] text-chassis-400">
+                            <input id="edit-anim-loop" type="checkbox" aria-label="Loop custom animation while the button is held" title="Repeat the custom animation until the button is released" onchange="updatePadConfigFromUI()" class="accent-chassis-100">
+                            LOOP CUSTOM ANIMATION WHILE HELD
+                        </label>
                     </div>
                 </div>
 
@@ -536,7 +536,6 @@
                     <div class="flex items-center justify-between border-b border-chassis-800 pb-1 text-[9px]">
                         <span class="font-bold text-chassis-300">KEYFRAME SEQUENCE EDITOR</span>
                         <div class="flex gap-1">
-                                <button onclick="playSelectedPad()" title="Play the selected pad sound and animation" class="flex items-center gap-1 px-2 py-0.5 bg-chassis-750 hover:bg-chassis-700 text-chassis-100 font-bold rounded-sm"><i data-lucide="play" class="w-3 h-3"></i> PLAY</button>
                                 <button onclick="addKeyframeStep()" title="Add a frame to this button's animation" class="flex items-center gap-1 px-2 py-0.5 bg-chassis-800 hover:bg-chassis-700 text-chassis-100 rounded-sm"><i data-lucide="plus" class="w-3 h-3"></i> ADD FRAME</button>
                                 <button onclick="duplicateKeyframeStep()" title="Duplicate selected frame" class="flex items-center gap-1 px-2 py-0.5 bg-chassis-850 hover:bg-chassis-800 text-chassis-300 rounded-sm"><i data-lucide="copy" class="w-3 h-3"></i> DUP</button>
                                 <button onclick="deleteKeyframeStep()" title="Delete selected frame" class="flex items-center gap-1 px-2 py-0.5 bg-chassis-850 hover:bg-chassis-800 text-chassis-400 rounded-sm"><i data-lucide="trash-2" class="w-3 h-3"></i> DEL</button>
@@ -562,6 +561,7 @@
                         <div class="text-[9px] text-chassis-500 space-y-1 leading-tight">
                             <div class="font-bold text-chassis-300">★ Center = Pad #<span id="matrix-target-id">81</span></div>
                             <div>Click or drag across pads to paint frame #<span id="cur-frame-num">1</span>. Top circles = 91-98.</div>
+                            <div>Saved presets keep their grid positions when reused.</div>
                         </div>
                     </div>
                 </div>
@@ -617,6 +617,7 @@
         let currentKeyframeIndex = 0;
         let isMatrixPainting = false;
         let matrixPaintValue = false;
+        const pressedPads = new Set();
 
         const padConfigs = {}; 
         const activeTimers = {};
@@ -714,6 +715,7 @@
                 activeColor: '#ff8000',
                 activeGlow: 'rgba(255,128,0,0.95)',
                 animTime: 120,
+                animLoop: false,
                 waveform: 'auto',
                 attack: 0,
                 sustain: 100,
@@ -869,6 +871,8 @@
 
             document.getElementById('edit-anim-preset').value = cfg.animPreset;
             document.getElementById('edit-anim-time').value = cfg.animTime;
+            document.getElementById('edit-anim-loop').checked = Boolean(cfg.animLoop);
+            document.getElementById('edit-anim-loop').disabled = cfg.animPreset !== 'custom';
 
             syncPaletteControls(cfg.activeColor || '#fe0a00');
 
@@ -891,7 +895,10 @@
             cfg.cutoff = parseInt(document.getElementById('edit-cutoff').value);
             cfg.gain = parseFloat(document.getElementById('edit-gain').value);
             cfg.animPreset = document.getElementById('edit-anim-preset').value;
-            cfg.animTime = parseInt(document.getElementById('edit-anim-time').value);
+            const animTime = Number(document.getElementById('edit-anim-time').value);
+            cfg.animTime = Number.isFinite(animTime) && animTime > 0 ? animTime : 120;
+            document.getElementById('edit-anim-loop').disabled = cfg.animPreset !== 'custom';
+            cfg.animLoop = document.getElementById('edit-anim-loop').checked;
 
             const soundControls = {
                 waveform: 'waveform',
@@ -1159,8 +1166,12 @@
         function playSelectedPad() {
             const padId = selectedPadId;
             if (!padId) return;
+            const cfg = padConfigs[padId];
             handlePadDown(padId);
-            setTimeout(() => handlePadUp(padId), padConfigs[padId]?.animTime || 200);
+            const previewDuration = cfg.animLoop
+                ? (cfg.animTime || 120) * (cfg.keyframes?.length || 1)
+                : cfg.animTime || 200;
+            setTimeout(() => handlePadUp(padId), previewDuration);
         }
 
         // --- STREAMING_CHUNK:Implementing Interactive Keyframe Matrix Timeline... ---
@@ -1211,7 +1222,12 @@
             keyframePresets[presetId] = {
                 name: name.trim(),
                 animTime: cfg.animTime,
-                keyframes: JSON.parse(JSON.stringify(cfg.keyframes))
+                animLoop: Boolean(cfg.animLoop),
+                keyframes: JSON.parse(JSON.stringify(cfg.keyframes)),
+                positions: cfg.keyframes.map(frame => frame.map(offset => {
+                    const coords = padCoordinates[selectedPadId];
+                    return getPadIdAtCoordinate(coords.r + offset.dy, coords.c + offset.dx);
+                }).filter(noteId => noteId !== null))
             };
 
             try {
@@ -1233,9 +1249,18 @@
 
             cfg.animPreset = 'custom';
             cfg.animTime = preset.animTime || 120;
-            cfg.keyframes = JSON.parse(JSON.stringify(preset.keyframes));
+            cfg.animLoop = Boolean(preset.animLoop);
+            const center = padCoordinates[selectedPadId];
+            cfg.keyframes = Array.isArray(preset.positions)
+                ? preset.positions.map(frame => frame.map(noteId => {
+                    const coords = padCoordinates[noteId];
+                    return coords ? { dx: coords.c - center.c, dy: coords.r - center.r } : null;
+                }).filter(offset => offset !== null))
+                : JSON.parse(JSON.stringify(preset.keyframes));
             document.getElementById('edit-anim-preset').value = 'custom';
             document.getElementById('edit-anim-time').value = cfg.animTime;
+            document.getElementById('edit-anim-loop').checked = cfg.animLoop;
+            document.getElementById('edit-anim-loop').disabled = false;
             currentKeyframeIndex = 0;
             renderKeyframeTimeline();
             renderMatrixOffsetCanvas();
@@ -1383,6 +1408,7 @@
         function activateCustomKeyframeMode(cfg) {
             cfg.animPreset = 'custom';
             document.getElementById('edit-anim-preset').value = 'custom';
+            document.getElementById('edit-anim-loop').disabled = false;
         }
 
         function toggleMatrixOffset(dx, dy) {
@@ -1390,6 +1416,11 @@
             if (!cell) return;
             paintMatrixCell(cell, !cell.classList.contains('active-cell'));
             saveLocalStorageKit();
+        }
+
+        function getPadIdAtCoordinate(row, col) {
+            const entry = Object.entries(padCoordinates).find(([, coords]) => coords.r === row && coords.c === col);
+            return entry ? Number(entry[0]) : null;
         }
 
         // --- STREAMING_CHUNK:Implementing Sound Presets & Audio Engine... ---
@@ -1968,19 +1999,25 @@
         function handlePadDown(noteId) {
             clearScheduledPadTimers(noteId);
             cancelAnimationTimers(noteId);
+            pressedPads.add(noteId);
             playSynthesizedSound(noteId);
             setPadHardwareAndUiState(noteId, true);
 
             const cfg = padConfigs[noteId] || getDefaultPadConfig(noteId, 0, 0);
             if (cfg.animPreset === 'custom') {
-                runCustomKeyframeSequence(noteId, cfg.animTime);
+                runCustomKeyframeSequence(noteId, cfg.animTime, cfg.animLoop);
             } else {
                 runPresetAnimation(noteId, cfg.animPreset, cfg.animTime);
             }
         }
 
         function handlePadUp(noteId) {
+            pressedPads.delete(noteId);
             const cfg = padConfigs[noteId] || getDefaultPadConfig(noteId, 0, 0);
+            if (cfg.animPreset === 'custom' && cfg.animLoop) {
+                cancelAnimationTimers(noteId);
+                setPadHardwareAndUiState(noteId, false);
+            }
             if (cfg.animPreset === '1') {
                 clearScheduledPadTimers(noteId);
                 setPadHardwareAndUiState(noteId, false);
@@ -2076,12 +2113,37 @@
             delete activeFlashTimers[noteId];
         }
 
-        function runCustomKeyframeSequence(centerNoteId, stepDurationMs) {
+        function runCustomKeyframeSequence(centerNoteId, stepDurationMs, loopWhileHeld = false) {
             const centerCoords = padCoordinates[centerNoteId];
             if (!centerCoords) return;
 
             const cfg = padConfigs[centerNoteId];
             if (!cfg || !cfg.keyframes || cfg.keyframes.length === 0) return;
+
+            if (loopWhileHeld) {
+                const frameDuration = Math.max(30, Number(stepDurationMs) || 120);
+                const playFrame = frameIdx => {
+                    if (!pressedPads.has(centerNoteId)) return;
+                    cfg.keyframes[frameIdx].forEach(offset => {
+                        const targetRow = centerCoords.r + offset.dy;
+                        const targetCol = centerCoords.c + offset.dx;
+
+                        if (targetRow === -1 && targetCol >= 0 && targetCol < 8) {
+                            const note = 91 + targetCol;
+                            if (note !== centerNoteId) flashPadMomentary(note, frameDuration * 0.9, cfg);
+                        } else if (targetRow >= 0 && targetRow < 8 && targetCol >= 0 && targetCol <= 8) {
+                            const rowInfo = GRID_ROWS[targetRow];
+                            const note = (targetCol === 8) ? rowInfo.scene : rowInfo.base + targetCol;
+                            if (note !== centerNoteId) flashPadMomentary(note, frameDuration * 0.9, cfg);
+                        }
+                    });
+                    scheduleAnimationTimer(centerNoteId, () => {
+                        playFrame((frameIdx + 1) % cfg.keyframes.length);
+                    }, frameDuration);
+                };
+                playFrame(0);
+                return;
+            }
 
             cfg.keyframes.forEach((frameOffsets, frameIdx) => {
                 const delay = frameIdx * stepDurationMs;
@@ -2238,6 +2300,7 @@
                         activeColor: c.activeColor,
                         activeGlow: c.activeGlow,
                         animTime: c.animTime,
+                        animLoop: c.animLoop,
                         keyframes: c.keyframes,
                         sampleName: c.sampleName
                     };
@@ -2292,6 +2355,7 @@
                     activeColor: c.activeColor,
                     activeGlow: c.activeGlow,
                     animTime: c.animTime,
+                    animLoop: c.animLoop,
                     keyframes: c.keyframes,
                     sampleName: c.sampleName
                 };
