@@ -104,7 +104,7 @@ function startLoadingSequence() {
     loadingSequenceFinished = false;
     loadingOverlay.classList.remove('is-ready', 'is-visible');
     loadingOverlay.hidden = false;
-    loadingFrame.src = `loadingpage.html?run=${Date.now()}`;
+    loadingFrame.src = `Viste/loadingpage.html?run=${Date.now()}`;
 }
 
 function toggleVista(vista) {
@@ -131,7 +131,7 @@ function toggleVista(vista) {
     activeVista = vista;
     updateLaunchpadSceneLights();
     vistaOverlay.classList.remove('is-visible', 'is-ready');
-    vistaFrame.src = `vista${vista}.html?run=${Date.now()}`;
+    vistaFrame.src = `Viste/vista${vista}.html?run=${Date.now()}`;
     vistaOverlay.hidden = false;
 }
 

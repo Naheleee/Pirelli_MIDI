@@ -1,12 +1,12 @@
 @font-face {
     font-family: PirelliVar;
-    src: url('../fonts/PirelliVar.woff2') format('woff2-variations');
+    src: url('../Fonts/PirelliVar.woff2') format('woff2-variations');
     font-stretch: 100% 500%;
 }
 
 @font-face {
     font-family: PirelliStencil;
-    src: url('../fonts/PirelliStencil.woff2') format('woff2');
+    src: url('../Fonts/PirelliStencil.woff2') format('woff2');
 }
 
 *,
