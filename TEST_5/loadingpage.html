@@ -264,6 +264,11 @@
             const isLocalFilePage = window.location.protocol === "file:";
             const parentMessageTargetOrigin = isLocalFilePage ? "*" : window.location.origin;
             const totalCharacters = [...terminalLines].reduce((total, line) => total + line.dataset.text.length, 0);
+            const loadingAnimationDuration = reducedMotion
+                ? 0
+                : totalCharacters * 18 +
+                    [...terminalLines].filter(line => line.hasAttribute("data-reveal-progress")).length * (100 * 35 + 120) +
+                    Math.max(0, terminalLines.length - 1) * 120;
             let completedCharacters = 0;
             let completedProgress = 0;
             let audioGain;
@@ -290,7 +295,7 @@
             const notifyParentOfStart = () => {
                 if (window.parent !== window) {
                     window.parent.postMessage(
-                        { type: "loading-animation-started" },
+                        { type: "loading-animation-started", durationMs: loadingAnimationDuration },
                         parentMessageTargetOrigin
                     );
                 }

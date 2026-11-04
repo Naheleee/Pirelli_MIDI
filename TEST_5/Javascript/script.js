@@ -6,6 +6,7 @@ const letterCycleChannel = ablyClient.channels.get('letter-cycle');
 const letterCyclePresence = letterCycleChannel.presence;
 const handTrackingChannel = ablyClient.channels.get('handtracking-vista2');
 const keyboardChannel = ablyClient.channels.get('keyboard');
+const launchpadChannel = ablyClient.channels.get('launchpad');
 let lastHandTrackingPublish = 0;
 let letterCycleLeaderId = null;
 let letterCycleElection = 0;
@@ -35,6 +36,7 @@ let loadingSequenceStarted = false;
 let loadingSequenceFinished = false;
 let loadingCompletionTimeout = null;
 let activeVista = null;
+let launchpadBlinkRequested = false;
 const activeReceivedNotes = new Map();
 let receiverToneLoadPromise = null;
 let receiverAudioReady = null;
@@ -54,11 +56,42 @@ function playLoadedScreenSound() {
     });
 }
 
+function publishLaunchpadLedState(id, velocity) {
+    launchpadChannel.publish('led', { id, velocity }).catch(error => {
+        console.error('Failed to publish Launchpad LED state:', error);
+    });
+}
+
+function setLaunchpadLoadingBlink(isActive, options = {}) {
+    if (
+        launchpadBlinkRequested === isActive &&
+        options.durationMs === undefined &&
+        !options.reset
+    ) return;
+    launchpadBlinkRequested = isActive;
+    launchpadChannel.publish('led', {
+        type: 'loading-blink',
+        isActive,
+        ...options
+    }).catch(error => {
+        console.error('Failed to update Launchpad loading lights:', error);
+    });
+}
+
+function updateLaunchpadSceneLights() {
+    publishLaunchpadLedState(92, activeVista === 1 ? 9 : 0);
+    publishLaunchpadLedState(93, activeVista === 2 ? 9 : 0);
+}
+
+updateLaunchpadSceneLights();
+
 function startLoadingSequence() {
     vistaOverlay.hidden = true;
     vistaOverlay.classList.remove('is-visible', 'is-ready');
     vistaFrame.src = 'about:blank';
     activeVista = null;
+    updateLaunchpadSceneLights();
+    setLaunchpadLoadingBlink(false, { reset: true });
 
     if (loadingCompletionTimeout !== null) {
         window.clearTimeout(loadingCompletionTimeout);
@@ -75,6 +108,8 @@ function startLoadingSequence() {
 }
 
 function toggleVista(vista) {
+    setLaunchpadLoadingBlink(false, { reset: true });
+
     if (loadingCompletionTimeout !== null) {
         window.clearTimeout(loadingCompletionTimeout);
         loadingCompletionTimeout = null;
@@ -88,11 +123,13 @@ function toggleVista(vista) {
 
     if (activeVista === vista) {
         activeVista = null;
+        updateLaunchpadSceneLights();
         vistaOverlay.classList.remove('is-visible');
         return;
     }
 
     activeVista = vista;
+    updateLaunchpadSceneLights();
     vistaOverlay.classList.remove('is-visible', 'is-ready');
     vistaFrame.src = `vista${vista}.html?run=${Date.now()}`;
     vistaOverlay.hidden = false;
@@ -134,6 +171,9 @@ window.addEventListener('message', event => {
     if (event.data?.type === 'loading-animation-started') {
         loadingOverlay.classList.add('is-ready');
         loadingOverlay.classList.add('is-visible');
+        setLaunchpadLoadingBlink(true, {
+            durationMs: Number.isFinite(event.data.durationMs) ? event.data.durationMs : undefined
+        });
         return;
     }
     if (event.data?.type !== 'loading-animation-complete') return;
@@ -143,6 +183,7 @@ window.addEventListener('message', event => {
 
     loadingCompletionTimeout = window.setTimeout(() => {
         loadingOverlay.hidden = true;
+        setLaunchpadLoadingBlink(false, { reset: true });
         loadingCompletionTimeout = null;
         playLoadedScreenSound();
     }, 2000);
@@ -821,7 +862,7 @@ window.addEventListener('resize', () => {
         createPad(row.scene);
     }
 
-    ablyClient.channels.get('launchpad').subscribe('midi', message => {
+    launchpadChannel.subscribe('midi', message => {
         const data = message.data;
         if (!data || !Number.isInteger(data.id) || typeof data.isDown !== 'boolean') return;
         const pad = pads.get(data.id);
