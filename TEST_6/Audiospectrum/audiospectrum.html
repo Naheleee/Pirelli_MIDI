@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Spectrum Visualizer</title>
+    <style>
+        @font-face {
+            font-family: PirelliVar;
+            src: url('../Fonts/PirelliVar.woff2') format('woff2-variations');
+            font-stretch: 100% 500%;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Base styles matching the required colors and typography */
+        body {
+            position: relative;
+            margin: 0;
+            padding: 0;
+            background-color: #1a1a1a;
+            color: #f46404;
+            font-family: PirelliVar;
+            overflow: hidden; /* Prevent scrollbars */
+            box-sizing: border-box;
+        }
+
+        /* Top HUD container for Stats */
+        #hud {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: clamp(1px, 5vmin, 2rem);
+            box-sizing: border-box;
+            pointer-events: none; /* Let clicks pass through to the visualization */
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            font-size: clamp(4px, 13vmin, 10px);
+            text-transform: uppercase;
+           font-variation-settings: "wdth" 500; /* Default weight and width */
+        }
+
+        .hud-center {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: clamp(1px, 2vmin, 10px);
+        }
+
+        .dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background-color: #f46404;
+            border-radius: 50%;
+            /* 70 BPM = 60 / 70 seconds = ~0.857s per beat */
+            animation: blink 0.857s infinite;
+        }
+
+        @keyframes blink {
+            0%, 49% { opacity: 1; }
+            50%, 100% { opacity: 0; }
+        }
+
+        /* Start Button Overlay */
+        #overlay {
+            position: absolute;
+            font-variation-settings: "wdth" 500;
+            inset: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(26, 26, 26, 0.85);
+            z-index: 20;
+            transition: opacity 0.5s ease;
+        }
+
+        #start-btn {
+            font-variation-settings: "wdth" 500;
+            background-color: transparent;
+            color: #f46404;
+            border: 1px solid #f46404;
+            max-width: 100%;
+            padding: clamp(1px, 2vmin, 15px) clamp(2px, 5vmin, 40px);
+            font-size: clamp(4px, 10vmin, 1.2rem);
+            font-family: inherit;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: clamp(0px, 0.5vmin, 2px);
+            cursor: pointer;
+            border-radius: 25px;
+          
+        }
+
+        #start-btn:hover {
+            background-color: #f46404;
+            color: #1a1a1a;
+        }
+
+        .instructions {
+            max-width: 100%;
+            margin-top: clamp(1px, 2vmin, 15px);
+            font-size: clamp(4px, 8vmin, 0.9rem);
+            opacity: 0.8;
+            letter-spacing: clamp(0px, 0.25vmin, 1px);
+            text-align: center;
+        }
+
+        #visualizer {
+            display: block;
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Heads Up Display -->
+    <div id="hud">
+        <div id="vol-text">0%</div>
+        <div class="hud-center">BPM 70 <span class="dot"></span></div>
+        <div id="db-text">0 dBFS</div>
+    </div>
+
+    <!-- Start Button Overlay for permissions -->
+    <div id="overlay">
+        <div style="display: flex; flex-direction: column; align-items: center;">
+            <button id="start-btn">CAPTURE DESKTOP AUDIO</button>
+            <div class="instructions">Important: Check the "Share system audio" box in the browser prompt.</div>
+        </div>
+    </div>
+
+    <!-- Vector audio visualization -->
+    <svg id="visualizer" aria-hidden="true">
+        <path id="waveform" fill="none" stroke="#f46404" stroke-linejoin="miter"></path>
+        <g id="waveform-vertices" fill="#f46404"></g>
+    </svg>
+
+    <script>
+        const visualizer = document.getElementById('visualizer');
+        const waveform = document.getElementById('waveform');
+        const verticesGroup = document.getElementById('waveform-vertices');
+        const startBtn = document.getElementById('start-btn');
+        const overlay = document.getElementById('overlay');
+        const volEl = document.getElementById('vol-text');
+        const dbEl = document.getElementById('db-text');
+        const instructions = document.querySelector('.instructions');
+
+        let audioCtx;
+        let analyser;
+        let dataArray;
+        let stream;
+        let animationFrame;
+        const parentOrigin = window.location.protocol === 'file:' ? '*' : window.location.origin;
+        
+        // Settings for the "low vertex" angular look
+        const NUM_VERTICES = 16; // Very low point count across the whole width
+        const NOISE_GATE_THRESHOLD = 0.005; // Threshold for RMS to consider it "silence"
+        const vertices = Array.from({ length: NUM_VERTICES }, () => {
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            verticesGroup.appendChild(circle);
+            return circle;
+        });
+        let visualizerWidth = 0;
+        let visualizerHeight = 0;
+
+        // Resize the SVG coordinate system to fit its containing panel.
+        function resize() {
+            const { width, height } = visualizer.getBoundingClientRect();
+            visualizerWidth = width;
+            visualizerHeight = height;
+            visualizer.setAttribute('viewBox', `0 0 ${width} ${height}`);
+            waveform.setAttribute('stroke-width', String(Math.max(1, Math.min(width, height) * 0.02)));
+            vertices.forEach(vertex => {
+                vertex.setAttribute('r', String(Math.max(1.5, Math.min(width, height) * 0.035)));
+            });
+        }
+        window.addEventListener('resize', resize);
+        new ResizeObserver(resize).observe(document.body);
+        resize(); // Initial resize
+
+        // Initialize Audio context and start drawing
+        startBtn.addEventListener('click', async () => {
+            startBtn.disabled = true;
+            startBtn.textContent = 'WAITING FOR SCREEN SHARE';
+            instructions.textContent = 'Choose a screen or window and enable system audio to start.';
+            try {
+                const AudioContextConstructor = window.AudioContext || window.webkitAudioContext;
+                if (!AudioContextConstructor) {
+                    throw new Error('Web Audio is not supported in this browser.');
+                }
+                if (!navigator.mediaDevices?.getDisplayMedia) {
+                    throw new Error('Screen audio capture is not supported in this browser or page context.');
+                }
+
+                const captureRequest = navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: true
+                });
+                audioCtx = new AudioContextConstructor();
+                stream = await captureRequest;
+                if (stream.getAudioTracks().length === 0) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                    throw new Error('No system audio was shared. Enable "Share system audio" and try again.');
+                }
+
+                const source = audioCtx.createMediaStreamSource(stream);
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 1024;
+                source.connect(analyser);
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                await audioCtx.resume();
+                stream.getTracks().forEach(track => {
+                    track.addEventListener('ended', stopCapture, { once: true });
+                });
+
+                overlay.style.opacity = '0';
+                setTimeout(() => { overlay.style.display = 'none'; }, 500);
+                draw();
+            } catch (err) {
+                console.error("Error accessing desktop audio:", err);
+                if (stream) {
+                    stream.getTracks().forEach(track => track.stop());
+                    stream = null;
+                }
+                if (audioCtx && audioCtx.state !== 'closed') {
+                    await audioCtx.close();
+                }
+                audioCtx = null;
+                const message = err instanceof Error ? err.message : 'Audio capture failed. Check browser permissions and try again.';
+                instructions.textContent = message;
+                startBtn.textContent = 'TRY AGAIN';
+                startBtn.disabled = false;
+            }
+        });
+
+        function stopCapture() {
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+            animationFrame = null;
+            window.parent.postMessage(
+                { type: 'audio-volume', level: 0 },
+                parentOrigin
+            );
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            if (audioCtx && audioCtx.state !== 'closed') {
+                audioCtx.close();
+            }
+            audioCtx = null;
+            analyser = null;
+            dataArray = null;
+            overlay.style.display = 'flex';
+            overlay.style.opacity = '1';
+            startBtn.textContent = 'CAPTURE DESKTOP AUDIO';
+            startBtn.disabled = false;
+            instructions.textContent = 'Choose a screen or window and enable system audio to start.';
+        }
+
+        // The main visualization loop
+        function draw() {
+            animationFrame = requestAnimationFrame(draw);
+
+            // Get time-domain data (waveform)
+            if (!analyser || !dataArray) return;
+            analyser.getByteTimeDomainData(dataArray);
+
+            // 1. Calculate Volume and DB metrics
+            let sumSquares = 0;
+            for(let i = 0; i < dataArray.length; i++) {
+                let normalized = (dataArray[i] - 128) / 128.0; // range -1.0 to 1.0
+                sumSquares += normalized * normalized;
+            }
+            
+            // Root Mean Square (RMS) gives a good approximation of perceived volume
+            let rms = Math.sqrt(sumSquares / dataArray.length);
+            
+            // Noise Gate: if signal is extremely low, clamp to 0
+            if (rms < NOISE_GATE_THRESHOLD) {
+                rms = 0;
+            }
+
+            // Convert to decibels based on RMS
+            let db = rms > 0 ? 20 * Math.log10(rms) : -100;
+            db = Math.max(-100, Math.min(0, db)); // Clamp between -100 and 0
+            
+            // Convert RMS to a percentage (Multiplier tuned so normal loud music hits ~100%)
+            let volumePercent = Math.round(rms * 250); 
+            volumePercent = Math.min(100, Math.max(0, volumePercent));
+            window.parent.postMessage(
+                { type: 'audio-volume', level: volumePercent / 100 },
+                parentOrigin
+            );
+
+            // Update HUD text independently
+            volEl.innerText = `VOLUME ${volumePercent}%`;
+            dbEl.innerText = `${db.toFixed(1)} dBFS`;
+
+            // 2. Draw the visualizer
+            const w = visualizerWidth;
+            const h = visualizerHeight;
+            const sliceWidth = w / (NUM_VERTICES - 1);
+            const step = Math.floor(dataArray.length / NUM_VERTICES);
+            const points = [];
+
+            for(let i = 0; i < NUM_VERTICES; i++) {
+                let dataIndex = i * step;
+                let maxDeviation = 0;
+                
+                // Only scan for peaks if audio is actually playing (above noise gate)
+                if (rms > 0) {
+                    for(let j = 0; j < step && (dataIndex + j) < dataArray.length; j++) {
+                        let dev = (dataArray[dataIndex + j] - 128) / 128.0;
+                        if (Math.abs(dev) > Math.abs(maxDeviation)) {
+                            maxDeviation = dev;
+                        }
+                    }
+                }
+
+                // Keep waveform peaks within the top and bottom of the SVG.
+                let amplitude = maxDeviation * 0.85; 
+                let y = (h / 2) + (amplitude * (h / 2));
+
+                let x = i * sliceWidth;
+                points.push({x, y});
+            }
+            waveform.setAttribute('d', points
+                .map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`)
+                .join(' '));
+            points.forEach((point, index) => {
+                vertices[index].setAttribute('cx', String(point.x));
+                vertices[index].setAttribute('cy', String(point.y));
+            });
+        }
+    </script>
+</body>
+</html>
