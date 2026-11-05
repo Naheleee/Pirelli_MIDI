@@ -334,10 +334,6 @@ function watchMidiDeviceStatus(channelName, statusElement) {
     });
 }
 
-document.querySelectorAll('.midi-device-status').forEach(statusElement => {
-    watchMidiDeviceStatus(statusElement.dataset.channel, statusElement);
-});
-
 function prependKeyMessage(message) {
     const hadPreviousMessages = messageHistory.childElementCount > 0;
     const currentTransform = getComputedStyle(messageTrack).transform;
