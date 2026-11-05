@@ -50,6 +50,19 @@
         .letterelinea3 {
             transform: scaleX(-1);
         }
+
+        .lettere.is-animating .letterelinea1,
+        .lettere.is-animating .letterelinea2,
+        .lettere.is-animating .letterelinea3 {
+            visibility: hidden;
+        }
+
+        .lettere.is-animating .letterelinea1.is-visible,
+        .lettere.is-animating .letterelinea2.is-visible,
+        .lettere.is-animating .letterelinea3.is-visible {
+            visibility: visible;
+        }
+
         .letterelinea4 {
             transform: scaleX(1);
         }
@@ -64,7 +77,7 @@
 
 <body>
     <div class="container">
-        <div class="lettere" aria-label="Animated letters"></div>
+        <div class="lettere is-animating" aria-label="Animated letters"></div>
     </div>
     <script src="../Javascript/vista3.js"></script>
 </body>

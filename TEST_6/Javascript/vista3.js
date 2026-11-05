@@ -12,19 +12,60 @@ const rows = Array.from({ length: CONFIG.rowCount }, (_, index) => {
     wrapper.appendChild(row);
     return row;
 });
-const spansByRow = rows.map(row =>
+const spansByRow = rows.map((row, rowIndex) =>
     Array.from({ length: CONFIG.letterCount }, () => {
         const span = document.createElement('span');
-        span.className = 'lettera-singola';
+        span.className = rowIndex === 0 || rowIndex === 2
+            ? 'lettera-singola lettera-singola-reversed'
+            : 'lettera-singola';
         span.textContent = 'A';
         row.appendChild(span);
         return span;
     })
 );
+const rowGlyphs = ['P', 'I', 'R', 'E'];
 const spans = spansByRow[0];
 let letterState = spans.map(() => ({ glyph: 'A', width: CONFIG.minFontWidth }));
 let currentFontFamily = 'PirelliVar';
 let fontsReady = false;
+let closeStarted = false;
+let entranceStarted = false;
+let sequenceTimers = [];
+const sequenceDelayMs = 140;
+
+function postParentMessage(type) {
+    const targetOrigin = window.location.protocol === 'file:' ? '*' : window.location.origin;
+    window.parent.postMessage({ type }, targetOrigin);
+}
+
+function clearSequenceTimers() {
+    sequenceTimers.forEach(window.clearTimeout);
+    sequenceTimers = [];
+}
+
+function scheduleRows(rowsToShow, onComplete) {
+    clearSequenceTimers();
+    rowsToShow.forEach((row, index) => {
+        sequenceTimers.push(window.setTimeout(() => {
+            row.classList.toggle('is-visible', onComplete === undefined);
+            if (onComplete !== undefined && index === rowsToShow.length - 1) onComplete();
+        }, index * sequenceDelayMs));
+    });
+}
+
+function startEntranceSequence() {
+    if (closeStarted || entranceStarted) return;
+    entranceStarted = true;
+    scheduleRows([rows[2], rows[1], rows[0]]);
+}
+
+function startCloseAnimation() {
+    if (closeStarted) return;
+    closeStarted = true;
+    scheduleRows([rows[0], rows[1], rows[2]], () => {
+        postParentMessage('vista3-close-complete');
+    });
+}
 
 function getWaveWidths(crest) {
     return spans.map((_, index) => {
@@ -82,12 +123,13 @@ function fitText() {
 }
 
 function applyLetterState() {
-    spansByRow.forEach(rowSpans => {
+    spansByRow.forEach((rowSpans, rowIndex) => {
         rowSpans.forEach((span, index) => {
             const letter = letterState[index];
-            span.textContent = letter.glyph;
+            span.textContent = rowGlyphs[rowIndex] ?? letter.glyph;
             span.style.fontVariationSettings =
                 `"wdth" ${Math.max(CONFIG.minFontWidth, Math.min(CONFIG.maxFontWidth, letter.width))}`;
+            span.style.fontFeatureSettings = rowGlyphs[rowIndex] === 'I' ? '"ss01"' : 'normal';
         });
     });
 }
@@ -99,6 +141,14 @@ window.addEventListener('message', event => {
         !(window.location.protocol === 'file:' && event.origin === 'null')
     ) return;
     const data = event.data;
+    if (data?.type === 'vista3-enter') {
+        startEntranceSequence();
+        return;
+    }
+    if (data?.type === 'vista3-close') {
+        startCloseAnimation();
+        return;
+    }
     if (
         data?.type !== 'lettere-state' ||
         !Array.isArray(data.letters) ||
@@ -139,6 +189,7 @@ Promise.all([
 ]).then(() => {
     fontsReady = true;
     fitText();
+    postParentMessage('vista3-ready');
 }).catch(error => {
     console.error('Failed to load the letter canvas fonts:', error);
 });

@@ -27,11 +27,13 @@ const vistaOverlay = document.querySelector('.vista-overlay');
 const vistaFrame = vistaOverlay.querySelector('iframe');
 const isLocalFilePage = window.location.protocol === 'file:';
 const loadingMessageTargetOrigin = isLocalFilePage ? '*' : window.location.origin;
+const vistaMessageTargetOrigin = isLocalFilePage ? '*' : window.location.origin;
 let loadingSequenceStarted = false;
 let loadingSequenceFinished = false;
 let loadingCompletionTimeout = null;
 const loadingCompletionHoldMs = 2000;
 let activeVista = null;
+let vista3ClosePending = false;
 let launchpadBlinkRequested = false;
 
 function publishLaunchpadLedState(id, velocity) {
@@ -73,6 +75,7 @@ updateLaunchpadSceneLights();
 
 function startLoadingSequence() {
     window.dispatchEvent(new CustomEvent('loading-animation-cancelled'));
+    vista3ClosePending = false;
     vistaOverlay.hidden = true;
     vistaOverlay.classList.remove('is-visible', 'is-ready');
     vistaFrame.src = 'about:blank';
@@ -110,10 +113,19 @@ function toggleVista(vista) {
     if (activeVista === vista) {
         activeVista = null;
         updateLaunchpadSceneLights();
+        if (vista === 3) {
+            vista3ClosePending = true;
+            vistaFrame.contentWindow.postMessage(
+                { type: 'vista3-close' },
+                vistaMessageTargetOrigin
+            );
+            return;
+        }
         vistaOverlay.classList.remove('is-visible');
         return;
     }
 
+    vista3ClosePending = false;
     activeVista = vista;
     updateLaunchpadSceneLights();
     vistaOverlay.classList.remove('is-visible', 'is-ready');
@@ -128,8 +140,18 @@ loadingFrame.addEventListener('load', () => {
 });
 
 vistaFrame.addEventListener('load', () => {
+    if (vista3ClosePending) {
+        vistaFrame.contentWindow.postMessage(
+            { type: 'vista3-close' },
+            vistaMessageTargetOrigin
+        );
+        return;
+    }
     if (activeVista !== null && !vistaOverlay.hidden) {
-        if (activeVista === 3) syncLetterVista();
+        if (activeVista === 3) {
+            syncLetterVista();
+            return;
+        }
         vistaOverlay.classList.add('is-ready');
         vistaOverlay.classList.add('is-visible');
     }
@@ -150,9 +172,39 @@ vistaOverlay.addEventListener('transitionend', event => {
 
 window.addEventListener('message', event => {
     if (
+        event.origin !== window.location.origin &&
+        !(isLocalFilePage && event.origin === 'null')
+    ) return;
+
+    if (event.source === vistaFrame.contentWindow) {
+        if (event.data?.type === 'vista3-ready' && activeVista === 3 && !vistaOverlay.hidden) {
+            vistaOverlay.classList.add('is-ready');
+            vistaOverlay.classList.add('is-visible');
+            vistaFrame.contentWindow.postMessage(
+                { type: 'vista3-enter' },
+                vistaMessageTargetOrigin
+            );
+            return;
+        }
+
+        if (
+            event.data?.type === 'vista3-close-complete' &&
+            vista3ClosePending &&
+            activeVista === null
+        ) {
+            vista3ClosePending = false;
+            vistaOverlay.classList.remove('is-visible');
+            if (!vistaOverlay.classList.contains('is-ready')) {
+                vistaOverlay.hidden = true;
+                vistaFrame.src = 'about:blank';
+            }
+        }
+        return;
+    }
+
+    if (
         event.source !== loadingFrame.contentWindow ||
-        !loadingSequenceStarted ||
-        (event.origin !== window.location.origin && !(isLocalFilePage && event.origin === 'null'))
+        !loadingSequenceStarted
     ) return;
 
     if (event.data?.type === 'loading-animation-started') {

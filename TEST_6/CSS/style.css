@@ -943,6 +943,10 @@ p {
     font-size:270px;
 }
 
+.lettera-singola-reversed {
+    transform: scaleX(-1);
+}
+
 .loading-overlay {
     position: absolute;
     z-index: 20;
