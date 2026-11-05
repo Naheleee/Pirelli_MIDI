@@ -25,6 +25,8 @@
         .lettere {
             width: 100%;
             height: 100%;
+            padding: 0 10px;
+            
             display: flex;
             flex-direction: column;
             align-items: flex-start;
@@ -43,9 +45,13 @@
             white-space: nowrap;
         }
 
-        .lettere-riga:first-child,
-        .lettere-riga:last-child {
+        .lettere-riga:nth-child(odd):not(:last-child),
+        
+        .letterelinea3 {
             transform: scaleX(-1);
+        }
+        .letterelinea4 {
+            transform: scaleX(1);
         }
 
         .lettera-singola {
