@@ -6,9 +6,9 @@ const CONFIG = {
     minFontWidth: 100,
     maxFontWidth: 500
 };
-const rows = Array.from({ length: CONFIG.rowCount }, () => {
+const rows = Array.from({ length: CONFIG.rowCount }, (_, index) => {
     const row = document.createElement('div');
-    row.className = 'lettere-riga';
+    row.className = `lettere-riga letterelinea${index + 1}`;
     wrapper.appendChild(row);
     return row;
 });
