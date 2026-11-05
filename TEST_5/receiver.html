@@ -10,9 +10,10 @@
 </head>
 
 <body>
-    <div class="receiver-audio-control">
-        <button id="receiver-audio-enable" type="button">Enable Powerbrass audio</button>
-        <span id="receiver-audio-status" role="status">Audio is off. Enable it to hear the screen sound and received keys.</span>
+    <div class="receiver-camera-preview" aria-label="Live camera preview">
+        <video class="handtracking-video" playsinline muted aria-label="Live camera view"></video>
+        <canvas class="receiver-handtracking-overlay" width="2000" height="2000" aria-hidden="true"></canvas>
+        <div class="receiver-handtracking-labels" aria-hidden="true"></div>
     </div>
     <div class="container">
         <div class="box1">
@@ -25,7 +26,6 @@
                 </div>
                 <div class="cell2">
                     <div class="handtracking1" aria-label="Hand tracking camera">
-                        <video class="handtracking-video" playsinline muted></video>
                         <canvas class="handtracking-canvas" width="640" height="480"
                             aria-label="Camera view showing tracked fingertips"></canvas>
                         <p class="glifo1" aria-hidden="true">•</p>
@@ -138,15 +138,12 @@
         <div class="box5">
             <div class="lettere"></div>
         </div>
-        <div class="completion-overlay" role="status" aria-live="polite" hidden>
-            <p>all done</p>
+        <div class="vista-overlay" hidden>
+            <iframe title="Pirelli vista"></iframe>
         </div>
-    </div>
-    <div class="loading-overlay" hidden>
-        <iframe src="Viste/loadingpage.html" title="Pirelli loading animation"></iframe>
-    </div>
-    <div class="vista-overlay" hidden>
-        <iframe title="Pirelli vista"></iframe>
+        <div class="loading-overlay" hidden>
+            <iframe src="Viste/loadingpage.html" title="Pirelli loading animation"></iframe>
+        </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js"></script>

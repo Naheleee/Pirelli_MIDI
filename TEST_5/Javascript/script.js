@@ -21,40 +21,18 @@ window.addEventListener('handtracking-results', event => {
     });
 });
 
-const receiverAudioControl = document.querySelector('.receiver-audio-control');
-const receiverAudioButton = document.querySelector('#receiver-audio-enable');
-const receiverAudioStatus = document.querySelector('#receiver-audio-status');
 const loadingOverlay = document.querySelector('.loading-overlay');
 const loadingFrame = loadingOverlay.querySelector('iframe');
 const vistaOverlay = document.querySelector('.vista-overlay');
 const vistaFrame = vistaOverlay.querySelector('iframe');
 const isLocalFilePage = window.location.protocol === 'file:';
 const loadingMessageTargetOrigin = isLocalFilePage ? '*' : window.location.origin;
-const loadedScreenAudio = new Audio('SFX/Loaded.mp3');
-loadedScreenAudio.preload = 'auto';
 let loadingSequenceStarted = false;
 let loadingSequenceFinished = false;
 let loadingCompletionTimeout = null;
+const loadingCompletionHoldMs = 2000;
 let activeVista = null;
 let launchpadBlinkRequested = false;
-const activeReceivedNotes = new Map();
-let receiverToneLoadPromise = null;
-let receiverAudioReady = null;
-let receiverBrassInstrument = null;
-let receiverMasterFilter = null;
-let receiverChorus = null;
-let receiverReverb = null;
-let receiverDelay = null;
-
-function playLoadedScreenSound() {
-    loadedScreenAudio.currentTime = 0;
-    loadedScreenAudio.play().catch(error => {
-        if (error.name !== 'NotAllowedError') {
-            receiverAudioStatus.textContent = 'The screen sound could not play.';
-            console.error('Failed to play the receiver screen sound:', error);
-        }
-    });
-}
 
 function publishLaunchpadLedState(id, velocity) {
     launchpadChannel.publish('led', { id, velocity }).catch(error => {
@@ -79,13 +57,22 @@ function setLaunchpadLoadingBlink(isActive, options = {}) {
 }
 
 function updateLaunchpadSceneLights() {
-    publishLaunchpadLedState(92, activeVista === 1 ? 9 : 0);
-    publishLaunchpadLedState(93, activeVista === 2 ? 9 : 0);
+    [1, 2, 3].forEach((vista, index) => {
+        const id = 92 + index;
+        const isActive = activeVista === vista;
+        const pad = document.querySelector(`.launchpad-pad[data-id="${id}"]`);
+        if (pad) {
+            pad.classList.toggle('lit', isActive);
+            pad.classList.remove('pressed');
+        }
+        publishLaunchpadLedState(id, isActive ? 9 : 0);
+    });
 }
 
 updateLaunchpadSceneLights();
 
 function startLoadingSequence() {
+    window.dispatchEvent(new CustomEvent('loading-animation-cancelled'));
     vistaOverlay.hidden = true;
     vistaOverlay.classList.remove('is-visible', 'is-ready');
     vistaFrame.src = 'about:blank';
@@ -98,8 +85,6 @@ function startLoadingSequence() {
         loadingCompletionTimeout = null;
     }
 
-    loadedScreenAudio.pause();
-    loadedScreenAudio.currentTime = 0;
     loadingSequenceStarted = true;
     loadingSequenceFinished = false;
     loadingOverlay.classList.remove('is-ready', 'is-visible');
@@ -108,6 +93,7 @@ function startLoadingSequence() {
 }
 
 function toggleVista(vista) {
+    window.dispatchEvent(new CustomEvent('loading-animation-cancelled'));
     setLaunchpadLoadingBlink(false, { reset: true });
 
     if (loadingCompletionTimeout !== null) {
@@ -143,6 +129,7 @@ loadingFrame.addEventListener('load', () => {
 
 vistaFrame.addEventListener('load', () => {
     if (activeVista !== null && !vistaOverlay.hidden) {
+        if (activeVista === 3) syncLetterVista();
         vistaOverlay.classList.add('is-ready');
         vistaOverlay.classList.add('is-visible');
     }
@@ -169,231 +156,33 @@ window.addEventListener('message', event => {
     ) return;
 
     if (event.data?.type === 'loading-animation-started') {
+        window.dispatchEvent(new CustomEvent('loading-animation-started', {
+            detail: {
+                durationMs: Number.isFinite(event.data.durationMs) ? event.data.durationMs : 0
+            }
+        }));
         loadingOverlay.classList.add('is-ready');
         loadingOverlay.classList.add('is-visible');
         setLaunchpadLoadingBlink(true, {
-            durationMs: Number.isFinite(event.data.durationMs) ? event.data.durationMs : undefined
+            durationMs: Number.isFinite(event.data.durationMs) && event.data.durationMs > 0
+                ? event.data.durationMs + loadingCompletionHoldMs
+                : event.data.durationMs
         });
         return;
     }
     if (event.data?.type !== 'loading-animation-complete') return;
+    window.dispatchEvent(new CustomEvent('loading-animation-complete'));
 
     if (loadingSequenceFinished) return;
     loadingSequenceFinished = true;
 
     loadingCompletionTimeout = window.setTimeout(() => {
         loadingOverlay.hidden = true;
+        window.dispatchEvent(new CustomEvent('loading-overlay-dismissed'));
         setLaunchpadLoadingBlink(false, { reset: true });
         loadingCompletionTimeout = null;
-        playLoadedScreenSound();
-    }, 2000);
+    }, loadingCompletionHoldMs);
 });
-
-const receiverSoundSettings = {
-    filter: 18000,
-    attack: 1.089,
-    release: 8,
-    chorus: 100,
-    reverb: 0,
-    delay: 0,
-    resonance: 0.5,
-    decay: 0.1,
-    sustain: 0.05
-};
-
-function applyReceiverSoundSettings(settings) {
-    if (receiverMasterFilter) {
-        receiverMasterFilter.frequency.value = settings.filter;
-        receiverMasterFilter.Q.value = settings.resonance;
-    }
-    if (receiverChorus) receiverChorus.wet.value = settings.chorus / 100;
-    if (receiverReverb) receiverReverb.wet.value = settings.reverb / 100;
-    if (receiverDelay) receiverDelay.wet.value = settings.delay / 100;
-    if (receiverBrassInstrument) {
-        receiverBrassInstrument.set({
-            envelope: {
-                attack: settings.attack,
-                decay: settings.decay,
-                sustain: settings.sustain,
-                release: settings.release
-            }
-        });
-    }
-}
-
-keyboardChannel.subscribe('sound-controls', message => {
-    const data = message.data;
-    if (!data || typeof data !== 'object') return;
-
-    const bounds = {
-        filter: [100, 18000],
-        attack: [0.001, 3],
-        release: [0.02, 8],
-        chorus: [0, 100],
-        reverb: [0, 100],
-        delay: [0, 100],
-        resonance: [0.5, 15],
-        decay: [0.02, 1],
-        sustain: [0, 1]
-    };
-    Object.entries(bounds).forEach(([key, [min, max]]) => {
-        const value = data[key];
-        if (typeof value === 'number' && Number.isFinite(value) && value >= min && value <= max) {
-            receiverSoundSettings[key] = value;
-        }
-    });
-    applyReceiverSoundSettings(receiverSoundSettings);
-});
-
-function loadReceiverTone() {
-    if (window.Tone) return Promise.resolve();
-    if (receiverToneLoadPromise) return receiverToneLoadPromise;
-
-    receiverToneLoadPromise = new Promise((resolve, reject) => {
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js';
-        script.onload = () => resolve();
-        script.onerror = () => {
-            receiverToneLoadPromise = null;
-            reject(new Error('Failed to load Tone.js'));
-        };
-        document.head.appendChild(script);
-    });
-    return receiverToneLoadPromise;
-}
-
-function initializeReceiverAudio() {
-    if (receiverAudioReady) return receiverAudioReady;
-
-    receiverAudioReady = (async () => {
-        await loadReceiverTone();
-        await Tone.start();
-        await Tone.getContext().resume();
-
-        receiverMasterFilter = new Tone.Filter({
-            type: 'lowpass',
-            frequency: receiverSoundSettings.filter,
-            Q: receiverSoundSettings.resonance,
-            rolloff: -24
-        });
-        receiverChorus = new Tone.Chorus({
-            frequency: 1.5,
-            delayTime: 3.5,
-            depth: 0.35,
-            wet: receiverSoundSettings.chorus / 100
-        }).start();
-        receiverReverb = new Tone.Reverb({
-            decay: 4.5,
-            preDelay: 0.015,
-            wet: receiverSoundSettings.reverb / 100
-        });
-        receiverDelay = new Tone.FeedbackDelay({
-            delayTime: '8n',
-            feedback: 0.24,
-            wet: receiverSoundSettings.delay / 100
-        });
-        const masterGain = new Tone.Gain(1);
-        receiverMasterFilter.connect(receiverChorus);
-        receiverChorus.connect(receiverReverb);
-        receiverReverb.connect(receiverDelay);
-        receiverDelay.connect(masterGain);
-        masterGain.toDestination();
-
-        receiverBrassInstrument = new Tone.PolySynth(Tone.FMSynth, {
-            harmonicity: 1.4,
-            modulationIndex: 4,
-            oscillator: { type: 'sawtooth' },
-            modulation: { type: 'square' },
-            modulationEnvelope: {
-                attack: 0.03,
-                decay: 0.25,
-                sustain: 0.4,
-                release: 0.45
-            },
-            envelope: {
-                attack: receiverSoundSettings.attack,
-                decay: receiverSoundSettings.decay,
-                sustain: receiverSoundSettings.sustain,
-                release: receiverSoundSettings.release
-            }
-        });
-        receiverBrassInstrument.connect(receiverMasterFilter);
-    })().catch(error => {
-        receiverAudioReady = null;
-        receiverAudioStatus.textContent = 'Audio could not start. Check browser audio permissions.';
-        console.error('Failed to initialize receiver brass audio:', error);
-        throw error;
-    });
-
-    return receiverAudioReady;
-}
-
-function midiNoteName(midi) {
-    const noteNames = [
-        'C', 'C#', 'D', 'D#', 'E', 'F',
-        'F#', 'G', 'G#', 'A', 'A#', 'B'
-    ];
-    return `${noteNames[midi % 12]}${Math.floor(midi / 12) - 1}`;
-}
-
-function startReceivedNote(record) {
-    if (!receiverBrassInstrument || record.started) return;
-    record.started = true;
-    receiverBrassInstrument.triggerAttack(
-        record.notes.map(midiNoteName),
-        Tone.now(),
-        0.85
-    );
-}
-
-function playReceivedNote(data) {
-    if (!Number.isInteger(data.note) || data.note < 0 || data.note > 127) return;
-    const source = data.source === 'midi' ? 'midi' : 'computer';
-    const id = `${source}:${data.note}`;
-    if (activeReceivedNotes.has(id)) return;
-
-    const notes = Array.isArray(data.notes) &&
-        data.notes.length > 0 &&
-        data.notes.length <= 16 &&
-        data.notes.every(note => Number.isInteger(note) && note >= 0 && note <= 127)
-        ? data.notes
-        : [data.note];
-    const record = { notes, started: false };
-    activeReceivedNotes.set(id, record);
-    startReceivedNote(record);
-}
-
-function releaseReceivedNote(data) {
-    if (!Number.isInteger(data.note) || data.note < 0 || data.note > 127) return;
-    const source = data.source === 'midi' ? 'midi' : 'computer';
-    const id = `${source}:${data.note}`;
-    const record = activeReceivedNotes.get(id);
-    if (!record) return;
-
-    activeReceivedNotes.delete(id);
-    if (record.started && receiverBrassInstrument) {
-        receiverBrassInstrument.triggerRelease(
-            record.notes.map(midiNoteName),
-            Tone.now()
-        );
-    }
-}
-
-if (receiverAudioButton && receiverAudioStatus) {
-    receiverAudioButton.addEventListener('click', async () => {
-        receiverAudioButton.disabled = true;
-        receiverAudioStatus.textContent = 'Starting Powerbrass audio...';
-        try {
-            await initializeReceiverAudio();
-            receiverAudioButton.textContent = 'Powerbrass audio enabled';
-            receiverAudioStatus.textContent = 'Playing received keys.';
-            activeReceivedNotes.forEach(startReceivedNote);
-            receiverAudioControl.hidden = true;
-        } catch (error) {
-            receiverAudioButton.disabled = false;
-        }
-    });
-}
 
 const infoFrameObserver = new ResizeObserver(entries => {
     entries.forEach(({ target }) => {
@@ -851,7 +640,10 @@ window.addEventListener('resize', () => {
     function createPad(id, spacer = false) {
         const pad = document.createElement('div');
         pad.className = spacer ? 'launchpad-spacer' : 'launchpad-pad';
-        if (!spacer) pads.set(id, pad);
+        if (!spacer) {
+            pad.dataset.id = String(id);
+            pads.set(id, pad);
+        }
         matrix.appendChild(pad);
     }
 
@@ -862,17 +654,103 @@ window.addEventListener('resize', () => {
         createPad(row.scene);
     }
 
+    const studioPadIds = new Set(rows.flatMap(({ base }) =>
+        Array.from({ length: 8 }, (_, column) => base + column)
+    ));
+    const lastSenderSequences = new Map();
+    const sequencedSenders = new Set();
+    function isFreshSenderMessage(data, stream) {
+        if (typeof data.senderId !== 'string') return true;
+        if (Number.isInteger(data.sequence)) {
+            let senderSequences = lastSenderSequences.get(data.senderId);
+            if (!senderSequences) {
+                senderSequences = new Map();
+                lastSenderSequences.set(data.senderId, senderSequences);
+            }
+            const lastSequence = senderSequences.get(stream);
+            if (lastSequence !== undefined && data.sequence <= lastSequence) return false;
+            sequencedSenders.add(data.senderId);
+            senderSequences.set(stream, data.sequence);
+            return true;
+        }
+        return !sequencedSenders.has(data.senderId);
+    }
+
     launchpadChannel.subscribe('midi', message => {
         const data = message.data;
-        if (!data || !Number.isInteger(data.id) || typeof data.isDown !== 'boolean') return;
+        if (
+            !data ||
+            !Number.isInteger(data.id) ||
+            typeof data.isDown !== 'boolean' ||
+            !isFreshSenderMessage(data, 'midi')
+        ) return;
         const pad = pads.get(data.id);
         if (!pad) return;
-        pad.classList.toggle('active', data.isDown);
+        const sceneControl = data.id >= 91 && data.id <= 94;
+        pad.classList.toggle('pressed', data.isDown && !sceneControl);
         if (data.isDown) {
             prependKeyMessage(`LP:"BTN${data.id}"`);
             if (data.id === 91) startLoadingSequence();
             if (data.id === 92) toggleVista(1);
             if (data.id === 93) toggleVista(2);
+            if (data.id === 94) toggleVista(3);
+        }
+    });
+
+    const pendingLedUpdates = new Map();
+    launchpadChannel.subscribe('led', message => {
+        const data = message.data;
+        if (!data) return;
+        if (data?.type === 'animation-frame') {
+            if (
+                !Array.isArray(data.litIds) ||
+                !data.litIds.every(id => Number.isInteger(id) && studioPadIds.has(id)) ||
+                !isFreshSenderMessage(data, 'led')
+            ) return;
+            studioPadIds.forEach(id => {
+                const pendingUpdate = pendingLedUpdates.get(id);
+                if (pendingUpdate !== undefined) window.clearTimeout(pendingUpdate);
+                pendingLedUpdates.delete(id);
+                pads.get(id).classList.remove('lit');
+            });
+            const animatedPads = new Set(data.litIds);
+            pads.forEach((pad, id) => {
+                pad.classList.toggle('animated', animatedPads.has(id));
+            });
+            return;
+        }
+        if (data?.type === 'clear-animation') {
+            if (!isFreshSenderMessage(data, 'led')) return;
+            pads.forEach(pad => pad.classList.remove('animated'));
+            return;
+        }
+        if (
+            !data ||
+            !Number.isInteger(data.id) ||
+            !pads.has(data.id) ||
+            (data.id >= 92 && data.id <= 94) ||
+            !Number.isInteger(data.velocity) ||
+            data.velocity < 0 ||
+            data.velocity > 127 ||
+            !isFreshSenderMessage(data, 'led')
+        ) return;
+
+        const pad = pads.get(data.id);
+        const pendingUpdate = pendingLedUpdates.get(data.id);
+        if (pendingUpdate !== undefined) {
+            window.clearTimeout(pendingUpdate);
+            pendingLedUpdates.delete(data.id);
+        }
+
+        const applyLedState = () => {
+            pad.classList.toggle('lit', data.velocity > 0);
+            pendingLedUpdates.delete(data.id);
+        };
+        const delayMs = Number.isFinite(data.delayMs) ? Math.max(0, data.delayMs) : 0;
+        if (delayMs === 0) {
+            applyLedState();
+        } else {
+            pendingLedUpdates.set(data.id, window.setTimeout(applyLedState, delayMs));
         }
     });
 })();
@@ -886,6 +764,10 @@ const CONFIG = {
     maxFontWidth: 500,
     midiFirstNote: 36,
     midiLastNote: 65,
+    sender2AnimationFirstNote: 36,
+    sender2AnimationLastNote: 95,
+    computerKeyboardFirstNote: 60,
+    computerKeyboardLastNote: 95,
     transitionDurationMs: 1000
 };
 const count = CONFIG.letterCount;
@@ -909,7 +791,20 @@ const spans = Array.from({ length: count }, () => {
     wrapper.appendChild(span);
     return span;
 });
-const completionOverlay = document.querySelector('.completion-overlay');
+function syncLetterVista() {
+    if (activeVista !== 3 || !vistaFrame.contentWindow) return;
+    vistaFrame.contentWindow.postMessage({
+        type: 'lettere-state',
+        fontFamily: getComputedStyle(wrapper).fontFamily,
+        letters: spans.map(span => {
+            const width = getComputedStyle(span).fontVariationSettings.match(/[\d.]+/);
+            return {
+                glyph: span.textContent,
+                width: width ? Number(width[0]) : CONFIG.minFontWidth
+            };
+        })
+    }, window.location.protocol === 'file:' ? '*' : window.location.origin);
+}
 const letterTrack = document.querySelector('.letter-track');
 const letterTrackDots = document.querySelector('.letter-track-dots');
 const letterTrackMarkers = spans.map(() => {
@@ -964,8 +859,16 @@ function getFittedFontSize(widths, fontFamily) {
         wrapper.style.fontSize = `${size}px`;
         const width = spans.reduce((total, span) => total + span.getBoundingClientRect().width, 0) +
             CONFIG.letterGap * (count - 1);
-        const letterHeight = Math.max(...spans.map(span => span.getBoundingClientRect().height));
-        if (width <= square.clientWidth && letterHeight <= height) low = size;
+        metricsContext.font = `${size}px "${fontFamily}"`;
+        const glyphMetrics = metricsContext.measureText('A');
+        const letterHeight = Number.isFinite(glyphMetrics.actualBoundingBoxAscent) &&
+            Number.isFinite(glyphMetrics.actualBoundingBoxDescent)
+            ? glyphMetrics.actualBoundingBoxAscent + glyphMetrics.actualBoundingBoxDescent
+            : size;
+        if (
+            width <= square.clientWidth - 1 &&
+            letterHeight <= height - 1
+        ) low = size;
         else high = size;
     }
     wrapper.style.fontSize = previousFontSize;
@@ -974,6 +877,26 @@ function getFittedFontSize(widths, fontFamily) {
         span.style.fontVariationSettings = previousWidths[index];
     });
     return low;
+}
+
+function fitLetterRowToWidth() {
+    const fontSize = Number.parseFloat(getComputedStyle(wrapper).fontSize);
+    if (!Number.isFinite(fontSize) || !square.clientWidth) return;
+
+    let scalableWidth = 0;
+    let fixedWidth = 0;
+    spans.forEach(span => {
+        const styles = getComputedStyle(span);
+        const padding = Number.parseFloat(styles.paddingLeft) +
+            Number.parseFloat(styles.paddingRight);
+        scalableWidth += span.getBoundingClientRect().width - padding;
+        fixedWidth += padding + Number.parseFloat(styles.marginLeft);
+    });
+
+    const targetScalableWidth = square.clientWidth - 1 - fixedWidth;
+    if (scalableWidth > 0 && targetScalableWidth > 0) {
+        wrapper.style.fontSize = `${fontSize * targetScalableWidth / scalableWidth}px`;
+    }
 }
 
 function fitText() {
@@ -996,12 +919,14 @@ function fitText() {
         span.style.fontVariationSettings = previousWidths[index];
     });
     wrapper.style.fontSize = `${fittedFontSize}px`;
+    fitLetterRowToWidth();
     updateLetterTrackDots();
 }
 
 let selectedGroup = count - 1;
 let lettersReady = false;
 let pendingMidiNote = null;
+let pendingMidiSource = null;
 let activeMidiNote = null;
 let animationFrame = null;
 let animationStart = 0;
@@ -1012,6 +937,8 @@ function applyWidths(widths) {
     spans.forEach((span, index) => {
         span.style.fontVariationSettings = `'wdth' ${Math.max(CONFIG.minFontWidth, Math.min(CONFIG.maxFontWidth, widths[index]))}`;
     });
+    fitLetterRowToWidth();
+    syncLetterVista();
 }
 
 function animateFrame(time) {
@@ -1023,25 +950,39 @@ function animateFrame(time) {
     if (progress < 1) animationFrame = requestAnimationFrame(animateFrame);
     else {
         animationFrame = null;
-        completionOverlay.hidden = false;
     }
 }
 
 const whitePitchClasses = new Set([0, 2, 4, 5, 7, 9, 11]);
+const sender2WhiteKeyCount = Array.from(
+    { length: CONFIG.sender2AnimationLastNote - CONFIG.sender2AnimationFirstNote + 1 },
+    (_, index) => CONFIG.sender2AnimationFirstNote + index
+).filter(midi => whitePitchClasses.has(midi % 12)).length;
 
-function isSelectableNote(note) {
+function isSelectableNote(note, source) {
+    const firstNote = source === 'computer'
+        ? CONFIG.computerKeyboardFirstNote
+        : CONFIG.midiFirstNote;
+    const lastNote = source === 'computer'
+        ? CONFIG.computerKeyboardLastNote
+        : CONFIG.midiLastNote;
     return Number.isInteger(note) &&
-        note >= CONFIG.midiFirstNote &&
-        note <= CONFIG.midiLastNote &&
+        note >= firstNote &&
+        note <= lastNote &&
         whitePitchClasses.has(note % 12);
 }
 
-function getGroupIndex(note) {
+function getGroupIndex(note, source) {
+    const firstNote = source === 'computer'
+        ? CONFIG.sender2AnimationFirstNote
+        : CONFIG.midiFirstNote;
     let whiteKeysBefore = 0;
-    for (let midi = CONFIG.midiFirstNote; midi < note; midi++) {
+    for (let midi = firstNote; midi < note; midi++) {
         if (whitePitchClasses.has(midi % 12)) whiteKeysBefore++;
     }
-    return Math.floor(whiteKeysBefore / 2);
+    if (source !== 'computer') return Math.floor(whiteKeysBefore / 2);
+
+    return Math.floor(whiteKeysBefore * count / sender2WhiteKeyCount);
 }
 
 function setActiveSegment(group) {
@@ -1052,7 +993,6 @@ function setActiveSegment(group) {
 
 function animateGroup(group) {
     selectedGroup = group;
-    completionOverlay.hidden = true;
     if (animationFrame !== null) cancelAnimationFrame(animationFrame);
     animationFrom = spans.map(span => {
         const match = getComputedStyle(span).fontVariationSettings.match(/[\d.]+/);
@@ -1063,22 +1003,24 @@ function animateGroup(group) {
     animationFrame = requestAnimationFrame(animateFrame);
 }
 
-function selectNote(note) {
-    if (!isSelectableNote(note)) return;
+function selectNote(note, source) {
+    if (!isSelectableNote(note, source)) return;
     activeMidiNote = note;
-    const group = getGroupIndex(note);
+    const group = getGroupIndex(note, source);
     setActiveSegment(group);
     if (!lettersReady) {
         pendingMidiNote = note;
+        pendingMidiSource = source;
         return;
     }
     animateGroup(group);
 }
 
-function releaseNote(note) {
-    if (!isSelectableNote(note) || activeMidiNote !== note) return;
+function releaseNote(note, source) {
+    if (!isSelectableNote(note, source) || activeMidiNote !== note) return;
     activeMidiNote = null;
     pendingMidiNote = null;
+    pendingMidiSource = null;
     setActiveSegment(null);
 }
 
@@ -1089,10 +1031,11 @@ Promise.all([
     fitText();
     lettersReady = true;
     if (pendingMidiNote !== null && activeMidiNote === pendingMidiNote) {
-        animateGroup(getGroupIndex(pendingMidiNote));
+        animateGroup(getGroupIndex(pendingMidiNote, pendingMidiSource));
     } else applyWidths(animationTo);
     updateLetterTrackDots();
     pendingMidiNote = null;
+    pendingMidiSource = null;
 });
 let fontChangeRequest = 0;
 const looperSquares = Array.from(document.querySelectorAll('.looper-square'));
@@ -1216,17 +1159,21 @@ if (looperSquares.length > 0) {
 keyboardChannel.subscribe('midi', message => {
     const data = message.data;
     if (data?.type === 'noteon') {
-        playReceivedNote(data);
+        const firstNote = data.source === 'computer'
+            ? CONFIG.computerKeyboardFirstNote
+            : CONFIG.midiFirstNote;
+        const lastNote = data.source === 'computer'
+            ? CONFIG.computerKeyboardLastNote
+            : CONFIG.midiLastNote;
         if (
             Number.isInteger(data.note) &&
-            data.note >= CONFIG.midiFirstNote &&
-            data.note <= CONFIG.midiLastNote
+            data.note >= firstNote &&
+            data.note <= lastNote
         ) prependKeyMessage(formatKeyboardNote(data.note));
-        selectNote(data.note);
+        selectNote(data.note, data.source);
     }
     if (data?.type === 'noteoff') {
-        releaseReceivedNote(data);
-        releaseNote(data.note);
+        releaseNote(data.note, data.source);
     }
     if (
         data?.type === 'fontchange' &&
@@ -1236,6 +1183,7 @@ keyboardChannel.subscribe('midi', message => {
         document.fonts.load(`16px "${data.fontFamily}"`, 'A').then(() => {
             if (request === fontChangeRequest) {
                 wrapper.style.fontFamily = `"${data.fontFamily}"`;
+                syncLetterVista();
                 updateTypeGuides();
                 updateWidthGuides(currentFontWidth);
                 styleStatus.textContent = data.fontFamily === 'PirelliStencil'

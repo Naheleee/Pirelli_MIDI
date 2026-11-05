@@ -145,10 +145,63 @@ ablyClient.channels.get('letter-cycle').subscribe('letter', message => {
         createPad(row.scene);
     }
 
+    const studioPadIds = new Set(rows.flatMap(({ base }) =>
+        Array.from({ length: 8 }, (_, column) => base + column)
+    ));
+    const lastSenderSequences = new Map();
+    const sequencedSenders = new Set();
+    function isFreshSenderMessage(data, stream) {
+        if (typeof data.senderId !== 'string') return true;
+        if (Number.isInteger(data.sequence)) {
+            let senderSequences = lastSenderSequences.get(data.senderId);
+            if (!senderSequences) {
+                senderSequences = new Map();
+                lastSenderSequences.set(data.senderId, senderSequences);
+            }
+            const lastSequence = senderSequences.get(stream);
+            if (lastSequence !== undefined && data.sequence <= lastSequence) return false;
+            sequencedSenders.add(data.senderId);
+            senderSequences.set(stream, data.sequence);
+            return true;
+        }
+        return !sequencedSenders.has(data.senderId);
+    }
+
     ablyClient.channels.get('launchpad').subscribe('midi', message => {
         const data = message.data;
-        if (!data || !Number.isInteger(data.id) || typeof data.isDown !== 'boolean') return;
+        if (
+            !data ||
+            !Number.isInteger(data.id) ||
+            typeof data.isDown !== 'boolean' ||
+            !isFreshSenderMessage(data, 'midi')
+        ) return;
         const pad = pads.get(data.id);
-        if (pad) pad.classList.toggle('active', data.isDown);
+        if (pad) pad.classList.toggle('pressed', data.isDown);
+    });
+
+    ablyClient.channels.get('launchpad').subscribe('led', message => {
+        const data = message.data;
+        if (!data) return;
+        if (
+            !Number.isInteger(data.id) ||
+            !pads.has(data.id) ||
+            !Number.isInteger(data.velocity) ||
+            !isFreshSenderMessage(data, 'led')
+        ) return;
+        pads.get(data.id).classList.toggle('lit', data.velocity > 0);
+    });
+
+    ablyClient.channels.get('launchpad').subscribe('led', message => {
+        const data = message.data;
+        if (
+            !data ||
+            data.type !== 'animation-frame' ||
+            !Array.isArray(data.litIds) ||
+            !data.litIds.every(id => Number.isInteger(id) && studioPadIds.has(id)) ||
+            !isFreshSenderMessage(data, 'led')
+        ) return;
+        studioPadIds.forEach(id => pads.get(id).classList.remove('lit'));
+        const animatedPads = new Set(data.litIds);
+        pads.forEach((pad, id) => pad.classList.toggle('animated', animatedPads.has(id)));
     });
 })();

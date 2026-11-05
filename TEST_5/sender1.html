@@ -614,6 +614,8 @@
     <script>
         const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
         const midiChannel = ablyClient.channels.get("launchpad");
+        const ledPublisherId = `sender1-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        let ledMessageSequence = 0;
         const ORANGE_LED = 9;
         const rows = [{
                 base: 81,
@@ -695,11 +697,12 @@
         const loadingSnakePadIds = rows.flatMap(row =>
             Array.from({ length: 8 }, (_, column) => row.base + column)
         );
-        const loadingSnakeSoundStopIndex = loadingSnakePadIds.indexOf(11);
-        let loadingBlinkInterval = null;
-        let loadingSnakeIndex = 0;
-        let loadingSnakeStartedAt = 0;
+        const studioPadIds = new Set(loadingSnakePadIds);
+        const remoteAnimationLitPads = new Set();
+        let receivedRemoteAnimationFrame = false;
         let loadingSnakeStepDuration = 120;
+        let loadingSnakeStartedAt = 0;
+        let loadingBlinkActive = false;
         const loadingSnakeTrail = new Set();
 
         function midiMessage(id, velocity) {
@@ -707,12 +710,28 @@
             return [0x90, id, velocity];
         }
 
-        function sendLed(id, velocity) {
-            if (!midiOutput) return;
-            try {
-                midiOutput.send(midiMessage(id, velocity));
-            } catch (error) {
-                document.getElementById('connect').title = `MIDI output error: ${error.message}`;
+        function sendLed(id, velocity, timestamp, publishState = true) {
+            if (publishState) {
+                midiChannel.publish('led', {
+                    id,
+                    velocity,
+                    senderId: ledPublisherId,
+                    sequence: ++ledMessageSequence,
+                    delayMs: timestamp === undefined ? 0 : Math.max(0, timestamp - performance.now())
+                }).catch(error => {
+                    console.error('Failed to publish Launchpad LED state:', error);
+                });
+            }
+            if (midiOutput) {
+                try {
+                    if (timestamp === undefined) {
+                        midiOutput.send(midiMessage(id, velocity));
+                    } else {
+                        midiOutput.send(midiMessage(id, velocity), timestamp);
+                    }
+                } catch (error) {
+                    document.getElementById('connect').title = `MIDI output error: ${error.message}`;
+                }
             }
         }
 
@@ -728,59 +747,40 @@
             }
         }
 
+        function scheduleLoadingSnake(startIndex) {
+            for (let index = startIndex; index < loadingSnakePadIds.length; index += 1) {
+                sendLed(
+                    loadingSnakePadIds[index],
+                    ORANGE_LED,
+                    loadingSnakeStartedAt + index * loadingSnakeStepDuration
+                );
+            }
+        }
+
         function setLoadingBlink(isActive, { durationMs, reset = false } = {}) {
             if (isActive) {
-                if (loadingBlinkInterval !== null) {
-                    window.clearTimeout(loadingBlinkInterval);
-                    loadingBlinkInterval = null;
-                }
+                if (midiOutput && typeof midiOutput.clear === 'function') midiOutput.clear();
                 stopAnimationPlayback();
-                loadingSnakeIndex = 0;
-                loadingSnakeStartedAt = performance.now();
+                loadingBlinkActive = true;
                 loadingSnakeStepDuration = Number.isFinite(durationMs) && durationMs > 0
-                    ? durationMs / loadingSnakeSoundStopIndex
+                    ? durationMs / (loadingSnakePadIds.length - 1)
                     : 120;
+                loadingSnakeStartedAt = performance.now() + 50;
                 loadingSnakeTrail.clear();
                 loadingSnakeTrail.add(loadingSnakePadIds[0]);
                 renderLoadingBlink(true);
-                const advanceSnake = () => {
-                    const elapsed = performance.now() - loadingSnakeStartedAt;
-                    const targetIndex = Math.min(
-                        loadingSnakePadIds.length - 1,
-                        Math.max(loadingSnakeIndex + 1, Math.floor(elapsed / loadingSnakeStepDuration))
-                    );
-                    for (let index = loadingSnakeIndex + 1; index <= targetIndex; index++) {
-                        loadingSnakeTrail.add(loadingSnakePadIds[index]);
-                    }
-                    loadingSnakeIndex = targetIndex;
-                    renderLoadingBlink(true);
-                    if (loadingSnakeIndex === loadingSnakePadIds.length - 1) {
-                        loadingBlinkInterval = null;
-                        return;
-                    }
-                    const nextStepAt = loadingSnakeStartedAt +
-                        (loadingSnakeIndex + 1) * loadingSnakeStepDuration;
-                    loadingBlinkInterval = window.setTimeout(
-                        advanceSnake,
-                        Math.max(0, nextStepAt - performance.now())
-                    );
-                };
                 if (durationMs === 0) {
-                    loadingSnakeIndex = loadingSnakePadIds.length - 1;
                     loadingSnakePadIds.forEach(id => loadingSnakeTrail.add(id));
                     renderLoadingBlink(true);
                 } else {
-                    loadingBlinkInterval = window.setTimeout(advanceSnake, loadingSnakeStepDuration);
+                    scheduleLoadingSnake(1);
                 }
                 return;
             }
 
-            if (loadingBlinkInterval !== null) {
-                window.clearTimeout(loadingBlinkInterval);
-                loadingBlinkInterval = null;
-            }
+            if (midiOutput && typeof midiOutput.clear === 'function') midiOutput.clear();
+            loadingBlinkActive = false;
             if (reset) {
-                loadingSnakeIndex = 0;
                 loadingSnakeTrail.clear();
                 renderLoadingBlink(false);
             } else {
@@ -788,10 +788,40 @@
             }
         }
 
+        function applyRemoteAnimationFrame(litIds) {
+            const nextLitPads = new Set(litIds);
+            if (!receivedRemoteAnimationFrame) {
+                studioPadIds.forEach(id => sendLed(id, 0, undefined, false));
+                receivedRemoteAnimationFrame = true;
+            }
+            for (const id of remoteAnimationLitPads) {
+                if (!nextLitPads.has(id)) sendLed(id, 0, undefined, false);
+            }
+            for (const id of nextLitPads) {
+                if (!remoteAnimationLitPads.has(id)) sendLed(id, ORANGE_LED, undefined, false);
+            }
+            remoteAnimationLitPads.clear();
+            nextLitPads.forEach(id => remoteAnimationLitPads.add(id));
+        }
+
         midiChannel.subscribe('led', message => {
             const data = message.data;
             if (!data || typeof data !== 'object') return;
+            if (data.senderId === ledPublisherId) return;
 
+            if (data.type === 'animation-frame') {
+                if (
+                    !Array.isArray(data.litIds) ||
+                    !data.litIds.every(id => Number.isInteger(id) && studioPadIds.has(id))
+                ) return;
+                applyRemoteAnimationFrame(data.litIds);
+                return;
+            }
+            if (data.type === 'clear-animation') {
+                applyRemoteAnimationFrame([]);
+                receivedRemoteAnimationFrame = false;
+                return;
+            }
             if (data.type === 'loading-blink' && typeof data.isActive === 'boolean') {
                 setLoadingBlink(data.isActive, data);
                 return;
@@ -805,18 +835,29 @@
             ) return;
 
             if (sceneLedStates.has(data.id)) sceneLedStates.set(data.id, data.velocity);
-            sendLed(data.id, data.velocity);
+            sendLed(data.id, data.velocity, undefined, false);
         });
 
         function pressPad(id) {
             if (pressedPads.has(id)) return;
             pressedPads.add(id);
-            midiChannel.publish('midi', { id, isDown: true });
+            midiChannel.publish('midi', {
+                id,
+                isDown: true,
+                senderId: ledPublisherId,
+                sequence: ++ledMessageSequence
+            });
         }
 
         function releasePad(id) {
             if (!pressedPads.delete(id)) return;
-            midiChannel.publish('midi', { id, isDown: false });
+            midiChannel.publish('midi', {
+                id,
+                isDown: false,
+                senderId: ledPublisherId,
+                sequence: ++ledMessageSequence
+            });
+            if (animationTriggerId === id) stopAnimationPlayback();
         }
 
         async function setLaunchpadPresence(isConnected) {
@@ -861,7 +902,6 @@
                 pressPad(id);
                 if (id !== 92 && id !== 93) playStudioPad(id, { triggerId: id });
             } else {
-                if (animationTriggerId === id) stopAnimationPlayback();
                 releasePad(id);
             }
         }
@@ -900,7 +940,17 @@
             midiInput = inputs.find(isLaunchpad) || inputs[0] || null;
             midiOutput = outputs.find(isLaunchpad) || outputs[0] || null;
 
-            if (midiOutput && loadingBlinkInterval !== null) renderLoadingBlink(true);
+            if (midiOutput && loadingBlinkActive) {
+                if (typeof midiOutput.clear === 'function') midiOutput.clear();
+                const currentIndex = Math.min(
+                    loadingSnakePadIds.length - 1,
+                    Math.max(0, Math.floor((performance.now() - loadingSnakeStartedAt) / loadingSnakeStepDuration))
+                );
+                loadingSnakeTrail.clear();
+                loadingSnakePadIds.slice(0, currentIndex + 1).forEach(id => loadingSnakeTrail.add(id));
+                renderLoadingBlink(true);
+                scheduleLoadingSnake(currentIndex + 1);
+            }
             if (midiInput) midiInput.onmidimessage = handleMidiMessage;
             void setLaunchpadPresence(Boolean(midiInput || midiOutput));
             if (!midiInput && !midiOutput) {
@@ -1246,18 +1296,30 @@
             }
         }
 
+        const studioPadIds = new Set(
+            [...studioGrid.querySelectorAll('.studio-pad')].map(pad => Number(pad.dataset.id))
+        );
+
         function applyAnimationFrame(litIds) {
             const nextLitPads = new Set(litIds);
             for (const id of animationLitPads) {
-                if (!nextLitPads.has(id)) sendLed(id, 0);
+                if (!nextLitPads.has(id)) sendLed(id, 0, undefined, false);
             }
             for (const id of nextLitPads) {
-                if (!animationLitPads.has(id)) sendLed(id, ORANGE_LED);
+                if (!animationLitPads.has(id)) sendLed(id, ORANGE_LED, undefined, false);
             }
             animationLitPads.clear();
             nextLitPads.forEach(id => animationLitPads.add(id));
             studioGrid.querySelectorAll('.studio-pad').forEach(pad => {
                 pad.classList.toggle('playing', nextLitPads.has(Number(pad.dataset.id)));
+            });
+            midiChannel.publish('led', {
+                type: 'animation-frame',
+                senderId: ledPublisherId,
+                sequence: ++ledMessageSequence,
+                litIds: [...nextLitPads].filter(id => studioPadIds.has(id))
+            }).catch(error => {
+                console.error('Failed to publish Launchpad animation frame:', error);
             });
         }
 

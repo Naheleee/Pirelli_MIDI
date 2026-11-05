@@ -1,0 +1,26 @@
+Documentazione
+La documentazione racconta il processo, non solo la parte finale
+
+Proceso: schizzi, prototipi, test falliti, decisioni prese e il motivo di ogni scelta. Gli errori e i cambi di direzione sono parte importante del racconto.
+Dietro le quinte: foto e video delle prove, del setup e del lavoro con gli oggetti.
+Mappatura: una tabella o uno schema che mostri quale oggetto o gesto controlla quale asse del font (peso, larghezza, inclinazione…) e in che modo.
+Tecnica: strumenti e modelli di machine learning usati, con brevi estratti di codice solo dove servono a capire il funzionamento.
+Repository GitHub: codice completo.
+Video finale
+
+
+Video definitivo
+Durata: massimo 60–90 secondi.
+Formato: 16:9, almeno Full HD (1920×1080).
+Contenuto: deve essere chiaro il rapporto causa-effetto tra il gesto fisico e la trasformazione del font. Chi guarda deve capire che sono i performer a modificare le lettere e in quale modo.
+Audio
+Titoli di coda: nome studenti, supsi, nome del font e crediti a Lineto
+
+
+Landing page
+Una sola pagina che presenta il font nello stile del vostro progetto e permette al pubblico di testarlo come avete fatto nella performance.
+
+Interazione a livelli: la pagina deve funzionare anche senza webcam. Molti utenti negano il permesso e da mobile non c’è la tastiera. Il mouse e il touch devono sempre essere un’alternativa.
+Coerenza con la performance: dove possibile, i gesti riconosciuti dalla webcam devono richiamare quelli usati nella performance.
+Contenuti minimi da specimen: nome del font, assi disponibili e loro range, set di caratteri, un link alla pagina del font su Lineto.
+Test: verificate che la pagina funzioni su desktop e su smartphone (responsive)

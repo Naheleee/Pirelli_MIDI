@@ -16,10 +16,13 @@
 }
 
 body {
+    --receiver-square-size: min(50vw, 100vh, 1600px);
+    --receiver-square-size: min(50vw, 100dvh, 1600px);
     font-family: "PirelliVar";
     margin: 0;
     padding: 0;
     background-color: black;
+    gap: 0;
     justify-content: center;
     align-items: center;
     display: flex;
@@ -28,56 +31,27 @@ body {
     overflow: hidden;
 }
 
-.receiver-audio-control {
-    position: fixed;
-    z-index: 10;
-    top: 12px;
-    right: 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    max-width: calc(100vw - 24px);
-    padding: 8px;
-    border: 1px solid #1A1A1A;
-    background: #F46404;
-    color: #1A1A1A;
-    font: 12px Arial, sans-serif;
-}
-
-.receiver-audio-control[hidden] {
-    display: none;
-}
-
-.receiver-audio-control button {
-    padding: 7px 10px;
-    border: 1px solid #1A1A1A;
-    background: #1A1A1A;
-    color: #F46404;
-    font: inherit;
-    cursor: pointer;
-}
-
-.receiver-audio-control button:disabled {
-    cursor: default;
-}
-
-#receiver-audio-status {
-    overflow-wrap: anywhere;
-}
-
 .container {
     position: relative;
     margin: 0;
     padding: 0;
-    width: min(100vw, 100vh, 1600px);
-    height: min(100vw, 100vh, 1600px);
-    width: min(100vw, 100dvh, 1600px);
-    height: min(100vw, 100dvh, 1600px);
+    width: var(--receiver-square-size);
+    height: var(--receiver-square-size);
+    flex: 0 0 auto;
     display: grid;
     grid-template-rows: minmax(0, 40fr) minmax(0, 10fr) minmax(0, 5fr) minmax(0, 16fr) minmax(0, 4fr) minmax(0, 25fr);
     background-color: #F46404;
     overflow: hidden;
     container-type: inline-size;
+}
+
+.receiver-camera-preview {
+    position: relative;
+    width: var(--receiver-square-size);
+    height: var(--receiver-square-size);
+    flex: 0 0 auto;
+    overflow: hidden;
+    background-color: #1A1A1A;
 }
 
 .box1 {
@@ -123,7 +97,7 @@ body {
 
 
 .titolo {
-    --title-font-size: 48px;
+    --title-font-size: 35px;
     --title-offset-x: -7px;
     --title-offset-y: 5px;
     visibility: hidden;
@@ -178,10 +152,43 @@ body {
 
 .handtracking-video {
     position: absolute;
-    width: 1px;
-    height: 1px;
-    opacity: 0;
+    inset: 0;
+    z-index: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transform: scaleX(-1);
     pointer-events: none;
+}
+
+.receiver-handtracking-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+}
+
+.receiver-handtracking-labels {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.receiver-handtracking-label {
+    position: absolute;
+    color: #F46404;
+    font-family: "PirelliVar", sans-serif;
+    font-variation-settings: "wdth" 500;
+    font-size: 8px;
+    line-height: 1;
+    white-space: pre;
 }
 
 .handtracking-canvas {
@@ -357,11 +364,13 @@ body {
     background-color: #1A1A1A;
 }
 
-.launchpad-pad.active {
+.launchpad-pad.pressed,
+.launchpad-pad.lit,
+.launchpad-pad.animated {
     background-color: #ffffff18;
 }
 
-.launchpad-pad.active::after {
+.launchpad-pad.pressed::after {
     content: "";
     position: absolute;
     top: 50%;
@@ -891,6 +900,8 @@ p {
     margin: 0;
     padding: 0;
     width: 100%;
+    height: 100%;
+    min-height: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -905,31 +916,7 @@ p {
     flex: 0 0 auto;
     margin: 0;
     padding: 10px;
-    font-size: 290px;
-}
-
-.completion-overlay {
-    position: absolute;
-    z-index: 5;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 4vw;
-    background-color: #F46404;
-    color: #1A1A1A;
-}
-
-.completion-overlay[hidden] {
-    display: none;
-}
-
-.completion-overlay p {
-    margin: 0;
-    font-family: "PirelliVar", sans-serif;
-    font-size: clamp(3rem, 20cqw, 20rem);
-    font-variation-settings: "wdth" 400;
-    line-height: 0.85;
-    text-align: center;
+    font-size:270px;
 }
 
 .loading-overlay {
