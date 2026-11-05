@@ -612,9 +612,12 @@
 
     <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <script>
-        const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
-        const midiChannel = ablyClient.channels.get("launchpad");
         const ledPublisherId = `sender1-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const ablyClient = new Ably.Realtime({
+            key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
+            clientId: ledPublisherId
+        });
+        const midiChannel = ablyClient.channels.get("launchpad");
         let ledMessageSequence = 0;
         const ORANGE_LED = 9;
         const rows = [{
@@ -656,6 +659,7 @@
         let midiAccess = null;
         let midiInput = null;
         let midiOutput = null;
+        let initializedMidiOutput = null;
         let launchpadPresenceActive = false;
         const matrix = document.getElementById('matrix');
         const status = document.getElementById('status');
@@ -693,11 +697,11 @@
             createPad(row.scene);
         }
 
-        const sceneLedStates = new Map([[92, 0], [93, 0]]);
+        const sceneLedStates = new Map([[92, 0], [93, 0], [94, 0]]);
         const loadingSnakePadIds = rows.flatMap(row =>
             Array.from({ length: 8 }, (_, column) => row.base + column)
         );
-        const studioPadIds = new Set(loadingSnakePadIds);
+        const launchpadGridPadIds = new Set(loadingSnakePadIds);
         const remoteAnimationLitPads = new Set();
         let receivedRemoteAnimationFrame = false;
         let loadingSnakeStepDuration = 120;
@@ -708,6 +712,19 @@
         function midiMessage(id, velocity) {
             if (id >= 91 && id <= 98) return [0xb0, id + 13, velocity];
             return [0x90, id, velocity];
+        }
+
+        function initializeLaunchpadOutput(output) {
+            try {
+                output.send([0xb0, 0, 0]);
+                output.send([0xb0, 0, 1]);
+                for (const id of pads.keys()) {
+                    output.send(midiMessage(id, 0));
+                }
+                initializedMidiOutput = output;
+            } catch (error) {
+                document.getElementById('connect').title = `MIDI output initialization failed: ${error.message}`;
+            }
         }
 
         function sendLed(id, velocity, timestamp, publishState = true) {
@@ -738,11 +755,11 @@
         function renderLoadingBlink(isActive) {
             for (const id of pads.keys()) {
                 if (sceneLedStates.has(id)) {
-                    sendLed(id, sceneLedStates.get(id));
+                    sendLed(id, sceneLedStates.get(id), undefined, false);
                 } else if (isActive && (id === 91 || loadingSnakeTrail.has(id))) {
-                    sendLed(id, ORANGE_LED);
+                    sendLed(id, ORANGE_LED, undefined, false);
                 } else {
-                    sendLed(id, 0);
+                    sendLed(id, 0, undefined, false);
                 }
             }
         }
@@ -752,7 +769,8 @@
                 sendLed(
                     loadingSnakePadIds[index],
                     ORANGE_LED,
-                    loadingSnakeStartedAt + index * loadingSnakeStepDuration
+                    loadingSnakeStartedAt + index * loadingSnakeStepDuration,
+                    false
                 );
             }
         }
@@ -791,7 +809,7 @@
         function applyRemoteAnimationFrame(litIds) {
             const nextLitPads = new Set(litIds);
             if (!receivedRemoteAnimationFrame) {
-                studioPadIds.forEach(id => sendLed(id, 0, undefined, false));
+                launchpadGridPadIds.forEach(id => sendLed(id, 0, undefined, false));
                 receivedRemoteAnimationFrame = true;
             }
             for (const id of remoteAnimationLitPads) {
@@ -812,7 +830,7 @@
             if (data.type === 'animation-frame') {
                 if (
                     !Array.isArray(data.litIds) ||
-                    !data.litIds.every(id => Number.isInteger(id) && studioPadIds.has(id))
+                    !data.litIds.every(id => Number.isInteger(id) && launchpadGridPadIds.has(id))
                 ) return;
                 applyRemoteAnimationFrame(data.litIds);
                 return;
@@ -841,6 +859,8 @@
         function pressPad(id) {
             if (pressedPads.has(id)) return;
             pressedPads.add(id);
+            pads.get(id)?.classList.add('active');
+            sendLed(id, ORANGE_LED, undefined, false);
             midiChannel.publish('midi', {
                 id,
                 isDown: true,
@@ -851,6 +871,8 @@
 
         function releasePad(id) {
             if (!pressedPads.delete(id)) return;
+            pads.get(id)?.classList.remove('active');
+            sendLed(id, sceneLedStates.get(id) ?? 0, undefined, false);
             midiChannel.publish('midi', {
                 id,
                 isDown: false,
@@ -913,6 +935,7 @@
                 if (midiInput) midiInput.onmidimessage = null;
                 midiInput = null;
                 midiOutput = null;
+                initializedMidiOutput = null;
                 void setLaunchpadPresence(false);
                 connectButton.textContent = 'Connect';
                 connectButton.title = 'Connect Launchpad';
@@ -939,6 +962,12 @@
             const isLaunchpad = port => /launchpad|novation|\blp\b/i.test(port.name);
             midiInput = inputs.find(isLaunchpad) || inputs[0] || null;
             midiOutput = outputs.find(isLaunchpad) || outputs[0] || null;
+
+            if (midiOutput && midiOutput !== initializedMidiOutput) {
+                initializeLaunchpadOutput(midiOutput);
+            } else if (!midiOutput) {
+                initializedMidiOutput = null;
+            }
 
             if (midiOutput && loadingBlinkActive) {
                 if (typeof midiOutput.clear === 'function') midiOutput.clear();
@@ -1296,7 +1325,7 @@
             }
         }
 
-        const studioPadIds = new Set(
+        const studioGridPadIds = new Set(
             [...studioGrid.querySelectorAll('.studio-pad')].map(pad => Number(pad.dataset.id))
         );
 
@@ -1317,7 +1346,7 @@
                 type: 'animation-frame',
                 senderId: ledPublisherId,
                 sequence: ++ledMessageSequence,
-                litIds: [...nextLitPads].filter(id => studioPadIds.has(id))
+                litIds: [...nextLitPads].filter(id => studioGridPadIds.has(id))
             }).catch(error => {
                 console.error('Failed to publish Launchpad animation frame:', error);
             });
