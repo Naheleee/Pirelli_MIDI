@@ -5,16 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PirelliVar Studio - Variable Font Wave</title>
   <script src="https://cdn.jsdelivr.net/npm/webmidi@3.1.16/dist/iife/webmidi.iife.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
   <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
   <style>
     @font-face {
       font-family: PirelliVar;
-      src: url('Fonts/PirelliVar.woff2') format('woff2-variations');
+      src: url('fonts/PirelliVar.woff2') format('woff2-variations');
       font-stretch: 100% 500%;
     }
     @font-face {
       font-family: PirelliStencil;
-      src: url('Fonts/PirelliStencil.woff2') format('woff2');
+      src: url('fonts/PirelliStencil.woff2') format('woff2');
     }
     * {
       box-sizing: border-box;
@@ -27,113 +28,6 @@
       place-items: center;
       overflow: hidden;
       background: #000;
-    }
-    #audioControl {
-      position: fixed;
-      z-index: 1;
-      top: 0;
-      left: 0;
-      width: 100%;
-      max-height: 48vh;
-      overflow: auto;
-      padding: 12px 16px;
-      border-bottom: 1px solid #ccc;
-      background: rgba(255, 255, 255, 0.96);
-      color: #222;
-      font: 14px Arial, sans-serif;
-    }
-    .control-heading {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 10px;
-    }
-    #audioButton {
-      padding: 8px 12px;
-      border: 0;
-      border-radius: 4px;
-      background: #087f3f;
-      color: #fff;
-      font: inherit;
-      cursor: pointer;
-    }
-    #audioButton:disabled {
-      cursor: wait;
-    }
-    #audioStatus {
-      color: #555;
-    }
-    .sound-picker {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-weight: 700;
-    }
-    #soundSelect {
-      min-width: 230px;
-      padding: 7px;
-    }
-    #presetDescription {
-      color: #666;
-    }
-    .control-grid, .chip-control-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-      gap: 10px 14px;
-      margin: 10px 0;
-    }
-    .sound-control label {
-      display: flex;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 4px;
-      color: #444;
-      font-size: 12px;
-      font-weight: 700;
-    }
-    .sound-control input[type="range"] {
-      width: 100%;
-      accent-color: #111;
-    }
-    .chip-lab {
-      border-top: 1px solid #ddd;
-      padding-top: 8px;
-      font-size: 12px;
-    }
-    .chip-lab summary {
-      cursor: pointer;
-      font-weight: 700;
-    }
-    .chip-lab select {
-      width: 100%;
-      padding: 6px;
-    }
-    .chip-hint {
-      display: block;
-      color: #777;
-      font-size: 11px;
-    }
-    .duty-buttons {
-      display: flex;
-      gap: 5px;
-      margin-top: 5px;
-    }
-    .duty-buttons button {
-      padding: 4px 7px;
-    }
-    .chord-buttons {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin: 8px 0;
-    }
-    .chord-pad {
-      padding: 6px 9px;
-    }
-    .chord-pad.selected {
-      border-color: #087f3f;
-      background: #eef8f1;
     }
     #square {
       width: 100%;
@@ -162,65 +56,13 @@
   </style>
 </head>
 <body>
-  <div id="audioControl" aria-label="Sound controls">
-    <div class="control-heading">
-      <button id="audioButton" type="button">Enable audio</button>
-      <label class="sound-picker" for="soundSelect">
-        SUONO
-        <select id="soundSelect"><option value="brass-section" selected>Power brass section</option></select>
-      </label>
-      <span id="presetDescription"></span>
-      <span id="audioStatus" role="status">Audio is off. Enable audio to play PC keys or the first 18 white keys of a MIDI keyboard.</span>
-    </div>
-    <div class="control-grid" aria-label="Sound controls">
-      <div class="sound-control"><label for="volumeControl">Volume <output id="volumeValue">100%</output></label><input id="volumeControl" type="range" min="0" max="100" value="100"></div>
-      <div class="sound-control"><label for="filterControl">Filter <output id="filterValue">18 kHz</output></label><input id="filterControl" type="range" min="100" max="18000" value="18000"></div>
-      <div class="sound-control"><label for="attackControl">Attack <output id="attackValue">1.089 s</output></label><input id="attackControl" type="range" min="0.001" max="3" step="0.001" value="1.089"></div>
-      <div class="sound-control"><label for="releaseControl">Release <output id="releaseValue">8 s</output></label><input id="releaseControl" type="range" min="0.02" max="8" step="0.01" value="8"></div>
-      <div class="sound-control"><label for="chorusControl">Chorus <output id="chorusValue">100%</output></label><input id="chorusControl" type="range" min="0" max="100" value="100"></div>
-      <div class="sound-control"><label for="reverbControl">Reverb <output id="reverbValue">0%</output></label><input id="reverbControl" type="range" min="0" max="100" value="0"></div>
-      <div class="sound-control"><label for="delayControl">Echo <output id="delayValue">0%</output></label><input id="delayControl" type="range" min="0" max="100" value="0"></div>
-    </div>
-    <details id="chipLab" class="chip-lab">
-      <summary>8-bit / SID lab - Pulse, arpeggiator and filter</summary>
-      <div class="chip-control-grid">
-        <div class="sound-control">
-          <label for="dutyCycle">Pulse width <output id="dutyValue">50.0%</output></label>
-          <input id="dutyCycle" type="range" min="0.05" max="0.5" step="0.001" value="0.5">
-          <div class="duty-buttons">
-            <button type="button" class="duty-button" data-value="0.125">12.5% NES</button>
-            <button type="button" class="duty-button" data-value="0.25">25% SID</button>
-            <button type="button" class="duty-button selected" data-value="0.5">50% SQ</button>
-          </div>
-        </div>
-        <div class="sound-control"><label for="arpSpeed">Arp speed <output id="arpSpeedValue">9 Hz</output></label><input id="arpSpeed" type="range" min="4" max="50" step="1" value="9"><label><span>Enable arpeggiator</span><input id="arpEnabled" type="checkbox"></label></div>
-        <div class="sound-control"><label for="arpPattern">Arp pattern</label><select id="arpPattern"><option value="minor">Minor triad - 0, 3, 7, 12</option><option value="major">Major triad - 0, 4, 7, 12</option><option value="minor7">Minor 7th - 0, 3, 7, 10</option><option value="octaves">Octaves - 0, 12, 24, 12</option><option value="pentatonic">Minor pentatonic - 0, 3, 5, 7</option></select></div>
-        <div class="sound-control"><label for="filterRes">Filter resonance <output id="filterResValue">0.5 Q</output></label><input id="filterRes" type="range" min="0.5" max="15" step="0.5" value="0.5"><span class="chip-hint">Cutoff uses the main Filter control above.</span></div>
-        <div class="sound-control"><label for="envDecay">Envelope decay <output id="envDecayValue">100 ms</output></label><input id="envDecay" type="range" min="0.02" max="1" step="0.01" value="0.1"></div>
-        <div class="sound-control"><label for="envSustain">Envelope sustain <output id="envSustainValue">0.05</output></label><input id="envSustain" type="range" min="0" max="1" step="0.05" value="0.05"></div>
-      </div>
-      <div class="chip-utility-panel">
-        <div class="chip-utility-title">QUICK CHORD PADS - HOLD TO PLAY</div>
-        <div class="chord-buttons">
-          <button type="button" class="chord-pad" data-notes="57,60,64">A3 minor (keys 1–4)</button>
-          <button type="button" class="chord-pad" data-notes="60,64,67">C4 major (keys 5–8)</button>
-          <button type="button" class="chord-pad" data-notes="62,65,69">D4 minor (keys 9–12)</button>
-          <button type="button" class="chord-pad" data-notes="65,69,72">F4 major (keys 13–18)</button>
-        </div>
-        <span class="chip-hint">The first 18 white MIDI keys (starting at C2) map to chords: keys 1–4 A3 minor, 5–8 C4 major, 9–12 D4 minor, and 13–18 F4 major.</span>
-      </div>
-    </details>
-  </div>
   <main id="square">
     <div id="wrapper"></div>
   </main>
   <script>
     const square = document.getElementById('square');
     const wrapper = document.getElementById('wrapper');
-    const ablyClient = new Ably.Realtime({
-      key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
-      clientId: 'sender2-keyboard'
-    });
+    const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
     const midiChannel = ablyClient.channels.get('keyboard');
     // Adjust letter spacing and transition behavior here.
     const CONFIG = {
@@ -230,8 +72,7 @@
       maxFontWidth: 500,
       fontSizeSafetyScale: 0.75,
       midiFirstNote: 36,
-      midiLastNote: 95,
-      computerKeyboardFirstMidi: 60,
+      midiLastNote: 65,
       transitionDurationMs: 1000,
       animationVelocity: 1,
       minAnimationVelocity: 0.1,
@@ -270,15 +111,11 @@
             CONFIG.elasticBounceStrength;
       }
     };
-    const spans = Array.from({ length: count }, (_, index) => {
+    const spans = Array.from({ length: count }, () => {
       const span = document.createElement('span');
       span.textContent = 'A';
       span.style.fontVariationSettings =
-        `'wdth' ${
-          CONFIG.minFontWidth +
-          (CONFIG.maxFontWidth - CONFIG.minFontWidth) *
-            index / (count - 1)
-        }`;
+        `'wdth' ${CONFIG.minFontWidth}`;
       wrapper.appendChild(span);
       return span;
     });
@@ -350,6 +187,8 @@
       spans.forEach((span, index) => {
         span.style.marginLeft =
           index === 0 ? '0px' : `${effectiveGap}px`;
+        span.style.fontVariationSettings =
+          `'wdth' ${CONFIG.minFontWidth}`;
       });
       let fittedFontSize = Infinity;
       for (const fontFamily of ['PirelliVar', 'PirelliStencil']) {
@@ -419,10 +258,6 @@
       const lastMidiNote = CONFIG.midiLastNote;
       const totalGroups = CONFIG.letterCount;
       const whitePitchClasses = new Set([0, 2, 4, 5, 7, 9, 11]);
-      const totalWhiteKeys = Array.from(
-        { length: lastMidiNote - firstMidiNote + 1 },
-        (_, index) => firstMidiNote + index
-      ).filter(note => whitePitchClasses.has(note % 12)).length;
       const groupLetters = Array.from(
         document.querySelectorAll('#wrapper span')
       );
@@ -442,22 +277,12 @@
         );
       }
 
-      function getGroupIndex(midi, midiKeyboard = false) {
-        if (midiKeyboard) {
-          let whiteKeyIndex = 0;
-          for (let note = firstMidiNote; note < midi; note++) {
-            if (whitePitchClasses.has(note % 12)) whiteKeyIndex++;
-          }
-          return whiteKeyIndex < totalGroups * 2
-            ? Math.floor(whiteKeyIndex / 2)
-            : null;
-        }
-
+      function getGroupIndex(midi) {
         let whiteKeysBefore = 0;
         for (let note = firstMidiNote; note < midi; note++) {
           if (whitePitchClasses.has(note % 12)) whiteKeysBefore++;
         }
-        return Math.floor(whiteKeysBefore * totalGroups / totalWhiteKeys);
+        return Math.floor(whiteKeysBefore / 2);
       }
 
       function showSelectedGroup() {
@@ -521,12 +346,7 @@
         }
       }
 
-      function pressMidiNote(
-        midi,
-        midiKeyboard = false,
-        soundNotes = [midi],
-        source = 'computer'
-      ) {
+      function pressMidiNote(midi) {
         if (
           !Number.isInteger(midi) ||
           midi < firstMidiNote ||
@@ -534,521 +354,104 @@
         ){
           return;
         }
-        midiChannel.publish('midi', {
-          type: 'noteon',
-          note: midi,
-          notes: soundNotes,
-          source
-        });
+        midiChannel.publish('midi', { type: 'noteon', note: midi });
         if (!lettersReady || !whitePitchClasses.has(midi % 12)) return;
-        const groupIndex = getGroupIndex(midi, midiKeyboard);
-        if (groupIndex === null) return;
-        selectedGroup = groupIndex;
+        selectedGroup = getGroupIndex(midi);
         showSelectedGroup();
       }
 
-      function releaseMidiNote(midi, source = 'computer') {
+      function releaseMidiNote(midi) {
         if (
           !Number.isInteger(midi) ||
           midi < firstMidiNote ||
           midi > lastMidiNote
         ) return;
-        midiChannel.publish('midi', {
-          type: 'noteoff',
-          note: midi,
-          source
-        });
+        midiChannel.publish('midi', { type: 'noteoff', note: midi });
       }
 
-      const computerKeyCodes = [
-        'Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5',
-        'Digit6', 'Digit7', 'Digit8', 'Digit9', 'Digit0',
-        'KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT',
-        'KeyZ', 'KeyU', 'KeyI', 'KeyO', 'KeyP',
-        'KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG',
-        'KeyH', 'KeyJ', 'KeyK', 'KeyL',
-        'KeyY', 'KeyX', 'KeyC', 'KeyV', 'KeyB', 'KeyN', 'KeyM'
-      ];
-      const keyboardNotes = new Map(
-        computerKeyCodes.map((code, index) => [
-          code,
-          CONFIG.computerKeyboardFirstMidi + index
-        ])
-      );
-      const pressedKeyboardKeys = new Set();
-      const soundingKeyboardKeys = new Set();
-      const activeMidiInputNotes = new Map();
-      const midiKeyAssignments = new Map([
-        [36, [57, 60, 64]],
-        [38, [57, 60, 64]],
-        [40, [57, 60, 64]],
-        [41, [57, 60, 64]],
-        [43, [60, 64, 67]],
-        [45, [60, 64, 67]],
-        [47, [60, 64, 67]],
-        [48, [60, 64, 67]],
-        [50, [62, 65, 69]],
-        [52, [62, 65, 69]],
-        [53, [62, 65, 69]],
-        [55, [62, 65, 69]],
-        [57, [65, 69, 72]],
-        [59, [65, 69, 72]],
-        [60, [65, 69, 72]],
-        [62, [65, 69, 72]],
-        [64, [65, 69, 72]],
-        [65, [65, 69, 72]]
+      const keyboardNotes = new Map([
+        ['KeyA', { note: 36, sound: 0 }],
+        ['KeyS', { note: 40, sound: 1 }],
+        ['KeyD', { note: 43, sound: 2 }],
+        ['KeyF', { note: 47, sound: 3 }],
+        ['KeyG', { note: 50, sound: 4 }],
+        ['KeyH', { note: 53, sound: 5 }],
+        ['KeyJ', { note: 57, sound: 6 }],
+        ['KeyK', { note: 60, sound: 7 }],
+        ['KeyL', { note: 64, sound: 8 }]
       ]);
-      const audioButton = document.getElementById('audioButton');
-      const audioStatus = document.getElementById('audioStatus');
-      const soundSelect = document.getElementById('soundSelect');
-      const presetDescription = document.getElementById('presetDescription');
-      const soundControls = {
-        volume: document.getElementById('volumeControl'),
-        filter: document.getElementById('filterControl'),
-        attack: document.getElementById('attackControl'),
-        release: document.getElementById('releaseControl'),
-        chorus: document.getElementById('chorusControl'),
-        reverb: document.getElementById('reverbControl'),
-        delay: document.getElementById('delayControl')
-      };
-      const soundOutputs = {
-        volume: document.getElementById('volumeValue'),
-        filter: document.getElementById('filterValue'),
-        attack: document.getElementById('attackValue'),
-        release: document.getElementById('releaseValue'),
-        chorus: document.getElementById('chorusValue'),
-        reverb: document.getElementById('reverbValue'),
-        delay: document.getElementById('delayValue')
-      };
-      const chipControls = {
-        duty: document.getElementById('dutyCycle'),
-        arpSpeed: document.getElementById('arpSpeed'),
-        arpEnabled: document.getElementById('arpEnabled'),
-        arpPattern: document.getElementById('arpPattern'),
-        resonance: document.getElementById('filterRes'),
-        decay: document.getElementById('envDecay'),
-        sustain: document.getElementById('envSustain')
-      };
-      const chipOutputs = {
-        duty: document.getElementById('dutyValue'),
-        arpSpeed: document.getElementById('arpSpeedValue'),
-        resonance: document.getElementById('filterResValue'),
-        decay: document.getElementById('envDecayValue'),
-        sustain: document.getElementById('envSustainValue')
-      };
-      const arpPatterns = {
-        minor: [0, 3, 7, 12],
-        major: [0, 4, 7, 12],
-        minor7: [0, 3, 7, 10],
-        octaves: [0, 12, 24, 12],
-        pentatonic: [0, 3, 5, 7]
-      };
-      const activeArps = new Map();
-      const heldChordPads = new Map();
-      let toneLoadPromise = null;
-      const SOUND_PRESETS = {
-        "brass-section": {
-          voice: "fm",
-          description: "Sezione brass potente, brillante e presente.",
-          options: {
-            harmonicity: 1.4,
-            modulationIndex: 4,
-            oscillator: { type: "sawtooth" },
-            modulation: { type: "square" },
-            modulationEnvelope: { attack: 0.03, decay: 0.25, sustain: 0.4, release: 0.45 }
-          },
-          attack: 1.089,
-          release: 8
-        }
-      };
-      let brassInstrument = null;
-      let audioGraphReady = null;
-      let masterFilter = null;
-      let masterGain = null;
-      let chorusEffect = null;
-      let reverbEffect = null;
-      let delayEffect = null;
-      let activePresetId = soundSelect.value;
-
-      function loadTone() {
-        if (window.Tone) return Promise.resolve();
-        if (toneLoadPromise) return toneLoadPromise;
-
-        toneLoadPromise = new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js';
-          script.onload = () => resolve();
-          script.onerror = () => {
-            toneLoadPromise = null;
-            reject(new Error('Failed to load Tone.js'));
-          };
-          document.head.appendChild(script);
-        });
-        return toneLoadPromise;
-      }
-
-      function midiToNote(midi) {
-        const noteNames = [
-          'C', 'C#', 'D', 'D#', 'E', 'F',
-          'F#', 'G', 'G#', 'A', 'A#', 'B'
-        ];
-        return `${noteNames[midi % 12]}${Math.floor(midi / 12) - 1}`;
-      }
-
-      async function startChordPad(button) {
-        if (heldChordPads.has(button)) return;
-        const chord = {
-          notes: button.dataset.notes.split(',').map(Number),
-          started: false
-        };
-        heldChordPads.set(button, chord);
+      const pressedKeyboardKeys = new Set();
+      const keyboardSounds = Array.from({ length: 9 }, (_, index) => {
+        return new Tone.Player().toDestination();
+      });
+      const keyboardSoundsReady = keyboardSounds.map(async (sound, index) => {
         try {
-          await initializeBrassAudio();
-          if (heldChordPads.get(button) !== chord) return;
-          audioStatus.textContent = 'Audio ready. Hold a keyboard key or chord pad to play.';
-          chord.started = true;
-          button.classList.add('selected');
-          brassInstrument.triggerAttack(
-            chord.notes.map(midiToNote),
-            Tone.now(),
-            0.72
+          const sampleUrl = new URL(
+            `SFX/2 cat eyes/cateyes_${index + 1}.wav`,
+            document.baseURI
           );
+          const response = await fetch(sampleUrl);
+          if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+          }
+          sound.buffer = await Tone.context.decodeAudioData(
+            await response.arrayBuffer()
+          );
+          return true;
         } catch (error) {
-          heldChordPads.delete(button);
-          console.error('Failed to start chord pad:', error);
+          console.error(`Failed to load cateyes_${index + 1}.wav:`, error);
+          return false;
         }
-      }
+      });
+      Tone.Transport.bpm.value = 70;
+      Tone.Transport.timeSignature = 4;
+      Tone.Transport.loop = true;
+      Tone.Transport.loopStart = 0;
+      Tone.Transport.loopEnd = '1m';
+      const beatsPerLoop = 4;
+      let transportBeatCount = 0;
+      let activeKeyboardSound = null;
+      let pendingSoundIndex = null;
+      let keyboardSoundRequest = 0;
 
-      function stopChordPad(button) {
-        const chord = heldChordPads.get(button);
-        if (!chord) return;
-        heldChordPads.delete(button);
-        button.classList.remove('selected');
-        if (chord.started && brassInstrument) {
-          brassInstrument.triggerRelease(
-            chord.notes.map(midiToNote),
-            Tone.now()
-          );
+      Tone.Transport.scheduleRepeat(time => {
+        const beat = transportBeatCount % beatsPerLoop;
+        if (beat === 0 && pendingSoundIndex !== null) {
+          const sound = keyboardSounds[pendingSoundIndex];
+          pendingSoundIndex = null;
+          if (activeKeyboardSound) activeKeyboardSound.stop(time);
+          sound.start(time);
+          activeKeyboardSound = sound;
         }
-      }
+        transportBeatCount++;
+      }, '4n');
 
-      function updateControlLabels() {
-        soundOutputs.volume.textContent = `${soundControls.volume.value}%`;
-        const filterHz = Number(soundControls.filter.value);
-        soundOutputs.filter.textContent = filterHz >= 1000
-          ? `${(filterHz / 1000).toFixed(filterHz % 1000 ? 1 : 0)} kHz`
-          : `${filterHz} Hz`;
-        soundOutputs.attack.textContent = `${Number(soundControls.attack.value).toFixed(3)} s`;
-        soundOutputs.release.textContent = `${Number(soundControls.release.value)} s`;
-        soundOutputs.chorus.textContent = `${soundControls.chorus.value}%`;
-        soundOutputs.reverb.textContent = `${soundControls.reverb.value}%`;
-        soundOutputs.delay.textContent = `${soundControls.delay.value}%`;
-        chipOutputs.duty.textContent = `${(Number(chipControls.duty.value) * 100).toFixed(1)}%`;
-        chipOutputs.arpSpeed.textContent = `${chipControls.arpSpeed.value} Hz`;
-        chipOutputs.resonance.textContent = `${Number(chipControls.resonance.value).toFixed(1)} Q`;
-        chipOutputs.decay.textContent = `${Math.round(Number(chipControls.decay.value) * 1000)} ms`;
-        chipOutputs.sustain.textContent = Number(chipControls.sustain.value).toFixed(2);
-      }
-
-      function updateSoundControls() {
-        updateControlLabels();
-        if (masterGain) masterGain.gain.value = Number(soundControls.volume.value) / 100;
-        if (masterFilter) {
-          masterFilter.frequency.value = Number(soundControls.filter.value);
-          masterFilter.Q.value = Number(chipControls.resonance.value);
-        }
-        if (chorusEffect) chorusEffect.wet.value = Number(soundControls.chorus.value) / 100;
-        if (reverbEffect) reverbEffect.wet.value = Number(soundControls.reverb.value) / 100;
-        if (delayEffect) delayEffect.wet.value = Number(soundControls.delay.value) / 100;
-        if (brassInstrument) {
-          const settings = {
-            envelope: {
-              attack: Number(soundControls.attack.value),
-              decay: Number(chipControls.decay.value),
-              sustain: Number(chipControls.sustain.value),
-              release: Number(soundControls.release.value)
-            }
-          };
-          if (SOUND_PRESETS[activePresetId].chip) {
-            settings.oscillator = { width: Number(chipControls.duty.value) };
-          }
-          brassInstrument.set(settings);
-        }
-        midiChannel.publish('sound-controls', {
-          filter: Number(soundControls.filter.value),
-          attack: Number(soundControls.attack.value),
-          release: Number(soundControls.release.value),
-          chorus: Number(soundControls.chorus.value),
-          reverb: Number(soundControls.reverb.value),
-          delay: Number(soundControls.delay.value),
-          resonance: Number(chipControls.resonance.value),
-          decay: Number(chipControls.decay.value),
-          sustain: Number(chipControls.sustain.value)
-        }).catch(error => {
-          console.error('Failed to publish sound control settings:', error);
-        });
-      }
-
-      function selectPreset(presetId, resetControls = true) {
-        const preset = SOUND_PRESETS[presetId];
-        if (!preset) throw new Error(`Unknown sound preset: ${presetId}`);
-
-        activePresetId = presetId;
-        presetDescription.textContent = preset.description;
-        if (resetControls) {
-          soundControls.attack.value = preset.attack;
-          soundControls.release.value = preset.release;
-          if (preset.chip) {
-            soundControls.filter.value = preset.chip.cutoff;
-            chipControls.duty.value = preset.chip.duty;
-            chipControls.arpSpeed.value = preset.chip.arpSpeed;
-            chipControls.arpEnabled.checked = preset.chip.arpEnabled;
-            chipControls.arpPattern.value = preset.chip.arpPattern;
-            chipControls.resonance.value = preset.chip.resonance;
-            chipControls.decay.value = preset.chip.decay;
-            chipControls.sustain.value = preset.chip.sustain;
-            document.querySelectorAll('.duty-button').forEach(button => {
-              button.classList.toggle(
-                'selected',
-                Number(button.dataset.value) === preset.chip.duty
-              );
-            });
-            document.getElementById('chipLab').open = true;
-          } else {
-            chipControls.resonance.value = 1;
-            const envelope = preset.options && preset.options.envelope;
-            chipControls.decay.value = envelope ? envelope.decay : 0.1;
-            chipControls.sustain.value = envelope ? envelope.sustain : 0.3;
-          }
-        }
-        const envelopeControlsEnabled = true;
-        soundControls.attack.disabled = !envelopeControlsEnabled;
-        soundControls.release.disabled = !envelopeControlsEnabled;
-        chipControls.duty.disabled = !preset.chip;
-        chipControls.decay.disabled = !envelopeControlsEnabled;
-        chipControls.sustain.disabled = !envelopeControlsEnabled;
-        document.querySelectorAll('.duty-button').forEach(button => {
-          button.disabled = !preset.chip;
-        });
-
-        if (!masterFilter) {
-          updateControlLabels();
-          return;
-        }
-        heldChordPads.forEach((_, button) => button.classList.remove('selected'));
-        heldChordPads.clear();
-        activeArps.forEach(arp => clearInterval(arp.intervalId));
-        activeArps.clear();
-        if (brassInstrument) {
-          brassInstrument.releaseAll();
-          brassInstrument.dispose();
-          brassInstrument = null;
-        }
-        soundingKeyboardKeys.clear();
-        const voiceTypes = {
-          synth: Tone.Synth,
-          fm: Tone.FMSynth,
-          am: Tone.AMSynth,
-          mono: Tone.MonoSynth,
-          chip: Tone.Synth
-        };
-        const VoiceType = voiceTypes[preset.voice];
-        if (!VoiceType) throw new Error(`Invalid synth type for preset: ${presetId}`);
-        const options = {
-          ...preset.options,
-          envelope: {
-            ...preset.options.envelope,
-            attack: Number(soundControls.attack.value),
-            decay: Number(chipControls.decay.value),
-            sustain: Number(chipControls.sustain.value),
-            release: Number(soundControls.release.value)
-          }
-        };
-        brassInstrument = new Tone.PolySynth(VoiceType, options);
-        brassInstrument.connect(masterFilter);
-        updateSoundControls();
-      }
-
-      function initializeBrassAudio() {
-        if (audioGraphReady) return audioGraphReady;
-
-        audioGraphReady = (async () => {
-          await loadTone();
+      function playKeyboardSound(index) {
+        const request = ++keyboardSoundRequest;
+        void (async () => {
           await Tone.start();
-          await Tone.getContext().resume();
-          masterFilter = new Tone.Filter({
-            type: 'lowpass',
-            frequency: Number(soundControls.filter.value),
-            Q: Number(chipControls.resonance.value),
-            rolloff: -24
-          });
-          chorusEffect = new Tone.Chorus({
-            frequency: 1.5,
-            delayTime: 3.5,
-            depth: 0.35,
-            wet: Number(soundControls.chorus.value) / 100
-          }).start();
-          reverbEffect = new Tone.Reverb({
-            decay: 4.5,
-            preDelay: 0.015,
-            wet: Number(soundControls.reverb.value) / 100
-          });
-          delayEffect = new Tone.FeedbackDelay({
-            delayTime: '8n',
-            feedback: 0.24,
-            wet: Number(soundControls.delay.value) / 100
-          });
-          masterGain = new Tone.Gain(Number(soundControls.volume.value) / 100);
-          masterFilter.connect(chorusEffect);
-          chorusEffect.connect(reverbEffect);
-          reverbEffect.connect(delayEffect);
-          delayEffect.connect(masterGain);
-          masterGain.toDestination();
-          selectPreset(soundSelect.value, false);
+          if (Tone.Transport.state !== 'started') Tone.Transport.start();
+          const isLoaded = await keyboardSoundsReady[index];
+          if (request !== keyboardSoundRequest || !isLoaded) return;
+          pendingSoundIndex = index;
         })().catch(error => {
-          audioGraphReady = null;
-          audioStatus.textContent = 'Audio could not start. Check browser audio permissions.';
-          console.error('Failed to initialize audio:', error);
-          throw error;
+          console.error('Failed to start keyboard audio:', error);
         });
-
-        return audioGraphReady;
       }
-
-      async function startKeyboardNote(code, midi) {
-        try {
-          await initializeBrassAudio();
-          if (!pressedKeyboardKeys.has(code)) return;
-          audioStatus.textContent = 'Audio ready. Hold a mapped key to play.';
-          const note = midiToNote(midi);
-          const velocity = 0.85;
-          if (chipControls.arpEnabled.checked) {
-            const pattern = arpPatterns[chipControls.arpPattern.value];
-            const arp = { pattern, step: 0, soundingMidi: midi, velocity, intervalId: null };
-            activeArps.set(midi, arp);
-            brassInstrument.triggerAttack(note, Tone.now(), velocity);
-            arp.intervalId = setInterval(() => {
-              if (activeArps.get(midi) !== arp) return;
-              brassInstrument.triggerRelease(midiToNote(arp.soundingMidi), Tone.now());
-              arp.step = (arp.step + 1) % arp.pattern.length;
-              arp.soundingMidi = midi + arp.pattern[arp.step];
-              brassInstrument.triggerAttack(midiToNote(arp.soundingMidi), Tone.now(), velocity);
-            }, 1000 / Number(chipControls.arpSpeed.value));
-          } else {
-            brassInstrument.triggerAttack(note, Tone.now(), velocity);
-          }
-          soundingKeyboardKeys.add(code);
-        } catch (error) {
-          audioStatus.textContent = 'Audio could not start. Check browser audio permissions.';
-          console.error('Failed to start brass note:', error);
-        }
-      }
-
-      audioButton.addEventListener('click', async () => {
-        audioButton.disabled = true;
-        audioStatus.textContent = 'Starting audio...';
-        try {
-          await initializeBrassAudio();
-          audioStatus.textContent = 'Audio ready. Play with a MIDI keyboard or PC keys (1–0, QWERTZUIOP, ASDFGHJKL, YXCVBNM).';
-        } catch (error) {
-          audioStatus.textContent = 'Audio could not start. Check browser audio permissions.';
-          console.error('Failed to enable brass audio:', error);
-        } finally {
-          audioButton.disabled = false;
-        }
-      });
-
-      soundSelect.addEventListener('change', () => selectPreset(soundSelect.value));
-      Object.values(soundControls).forEach(control => {
-        control.addEventListener('input', updateSoundControls);
-      });
-      Object.values(chipControls).forEach(control => {
-        control.addEventListener('input', updateSoundControls);
-        control.addEventListener('change', updateSoundControls);
-      });
-      document.querySelectorAll('.duty-button').forEach(button => {
-        button.addEventListener('click', () => {
-          chipControls.duty.value = button.dataset.value;
-          document.querySelectorAll('.duty-button').forEach(item => {
-            item.classList.toggle('selected', item === button);
-          });
-          updateSoundControls();
-        });
-      });
-      document.querySelectorAll('.chord-pad').forEach(button => {
-        button.addEventListener('pointerdown', event => {
-          event.preventDefault();
-          button.setPointerCapture(event.pointerId);
-          void startChordPad(button);
-        });
-        ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => {
-          button.addEventListener(type, () => stopChordPad(button));
-        });
-      });
-      updateControlLabels();
 
       window.addEventListener('keydown', event => {
-        const midi = keyboardNotes.get(event.code);
-        if (midi === undefined || pressedKeyboardKeys.has(event.code)) return;
+        const key = keyboardNotes.get(event.code);
+        if (key === undefined || pressedKeyboardKeys.has(event.code)) return;
         event.preventDefault();
         pressedKeyboardKeys.add(event.code);
-        void startKeyboardNote(event.code, midi);
-        pressMidiNote(midi);
+        playKeyboardSound(key.sound);
+        pressMidiNote(key.note);
       });
 
       function releaseKeyboardKey(code) {
-        const midi = keyboardNotes.get(code);
-        if (midi === undefined || !pressedKeyboardKeys.delete(code)) return;
-        if (soundingKeyboardKeys.delete(code) && brassInstrument) {
-          const arp = activeArps.get(midi);
-          if (arp) {
-            clearInterval(arp.intervalId);
-            activeArps.delete(midi);
-            brassInstrument.triggerRelease(midiToNote(arp.soundingMidi), Tone.now());
-          } else {
-            brassInstrument.triggerRelease(midiToNote(midi), Tone.now());
-          }
-        }
-        releaseMidiNote(midi);
-      }
-
-      async function startMidiInputNote(midi) {
-        if (
-          !Number.isInteger(midi) ||
-          midi < CONFIG.midiFirstNote ||
-          midi > CONFIG.midiLastNote ||
-          activeMidiInputNotes.has(midi)
-        ) return;
-
-        const notes = midiKeyAssignments.get(midi);
-        if (!notes) return;
-        activeMidiInputNotes.set(midi, notes);
-        pressMidiNote(midi, true, notes, 'midi');
-        try {
-          await initializeBrassAudio();
-          if (!activeMidiInputNotes.has(midi)) return;
-          brassInstrument.triggerAttack(
-            notes.map(midiToNote),
-            Tone.now(),
-            0.85
-          );
-        } catch (error) {
-          audioStatus.textContent = 'Audio could not start. Click Enable audio, then try the MIDI keyboard again.';
-          console.error('Failed to play MIDI keyboard note:', error);
-        }
-      }
-
-      function releaseMidiInputNote(midi) {
-        const notes = activeMidiInputNotes.get(midi);
-        if (!notes) return;
-        activeMidiInputNotes.delete(midi);
-        if (brassInstrument) {
-          brassInstrument.triggerRelease(
-            notes.map(midiToNote),
-            Tone.now()
-          );
-        }
-        releaseMidiNote(midi, 'midi');
+        const key = keyboardNotes.get(code);
+        if (key === undefined || !pressedKeyboardKeys.delete(code)) return;
+        releaseMidiNote(key.note);
       }
 
       window.addEventListener('keyup', event => {
@@ -1057,7 +460,6 @@
 
       window.addEventListener('blur', () => {
         pressedKeyboardKeys.forEach(releaseKeyboardKey);
-        heldChordPads.forEach((_, button) => stopChordPad(button));
       });
 
       const connectedMidiInputs = new WeakSet();
@@ -1085,13 +487,13 @@
 
         input.addListener('noteon', event => {
           if (event.velocity === 0) {
-            releaseMidiInputNote(event.note.number);
+            releaseMidiNote(event.note.number);
           } else {
-            startMidiInputNote(event.note.number);
+            pressMidiNote(event.note.number);
           }
         });
         input.addListener('noteoff', event => {
-          releaseMidiInputNote(event.note.number);
+          releaseMidiNote(event.note.number);
         });
       }
 
