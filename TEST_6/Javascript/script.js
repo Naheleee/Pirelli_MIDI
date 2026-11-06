@@ -735,7 +735,10 @@ window.addEventListener('resize', () => {
         const pad = pads.get(data.id);
         if (!pad) return;
         const sceneControl = data.id >= 91 && data.id <= 94;
-        pad.classList.toggle('pressed', data.isDown && !sceneControl);
+        pad.classList.toggle(
+            'pressed',
+            data.isDown && !sceneControl && data.animationControlsLight !== true
+        );
         if (data.isDown) {
             prependKeyMessage(`LP:"BTN${data.id}"`);
             if (data.id === 91) startLoadingSequence();

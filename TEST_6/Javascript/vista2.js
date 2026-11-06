@@ -176,7 +176,10 @@ ablyClient.channels.get('letter-cycle').subscribe('letter', message => {
             !isFreshSenderMessage(data, 'midi')
         ) return;
         const pad = pads.get(data.id);
-        if (pad) pad.classList.toggle('pressed', data.isDown);
+        if (pad) pad.classList.toggle(
+            'pressed',
+            data.isDown && data.animationControlsLight !== true
+        );
     });
 
     ablyClient.channels.get('launchpad').subscribe('led', message => {
