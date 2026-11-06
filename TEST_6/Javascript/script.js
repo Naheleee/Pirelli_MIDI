@@ -1,12 +1,14 @@
+const receiverClientId = `receiver-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const ablyClient = new Ably.Realtime({
     key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
-    clientId: `receiver-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    clientId: receiverClientId
 });
 const letterCycleChannel = ablyClient.channels.get('letter-cycle');
 const letterCyclePresence = letterCycleChannel.presence;
 const handTrackingChannel = ablyClient.channels.get('handtracking-vista2');
 const keyboardChannel = ablyClient.channels.get('keyboard');
 const launchpadChannel = ablyClient.channels.get('launchpad');
+const receiverAudioChannel = ablyClient.channels.get('receiver-audio');
 let lastHandTrackingPublish = 0;
 let letterCycleLeaderId = null;
 let letterCycleElection = 0;
@@ -38,6 +40,19 @@ let vista3ClosePending = false;
 let launchpadBlinkRequested = false;
 
 window.addEventListener('loading-overlay-dismissed', () => {
+    receiverAudioChannel.publish('loading-complete', {
+        receiverId: receiverClientId
+    }).catch(error => {
+        console.error('Failed to notify the looper that loading completed:', error);
+    });
+});
+
+receiverAudioChannel.subscribe('play-sfx', message => {
+    if (
+        message.data?.receiverId !== receiverClientId ||
+        message.data?.sound !== 'loaded'
+    ) return;
+
     loadingCompleteSound.currentTime = 0;
     loadingCompleteSound.play().catch(error => {
         console.error('Failed to play loading completion sound:', error);

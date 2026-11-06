@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Tone.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -989,6 +990,25 @@
                         });
                     }
                 });
+            });
+        });
+    </script>
+    <script>
+        const ablyClient = new Ably.Realtime({
+            key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
+            clientId: `looper-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        });
+        const receiverAudioChannel = ablyClient.channels.get('receiver-audio');
+
+        receiverAudioChannel.subscribe('loading-complete', message => {
+            const receiverId = message.data?.receiverId;
+            if (typeof receiverId !== 'string') return;
+
+            receiverAudioChannel.publish('play-sfx', {
+                receiverId,
+                sound: 'loaded'
+            }).catch(error => {
+                console.error('Failed to send loading completion sound to receiver:', error);
             });
         });
     </script>
