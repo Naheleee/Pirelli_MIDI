@@ -677,34 +677,30 @@ window.addEventListener('resize', () => {
 
 (() => {
     const rows = [
-        { base: 81, scene: 89 }, { base: 71, scene: 79 },
-        { base: 61, scene: 69 }, { base: 51, scene: 59 },
-        { base: 41, scene: 49 }, { base: 31, scene: 39 },
-        { base: 21, scene: 29 }, { base: 11, scene: 19 }
+        81, 71, 61, 51, 41, 31, 21, 11
     ];
     const pads = new Map();
     const matrix = document.querySelector('.launchpad-visualizer');
 
-    function createPad(id, spacer = false) {
+    function createPad(id) {
         const pad = document.createElement('div');
-        pad.className = spacer ? 'launchpad-spacer' : 'launchpad-pad';
-        if (!spacer) {
-            pad.dataset.id = String(id);
-            pads.set(id, pad);
-        }
+        pad.className = 'launchpad-pad';
+        pad.dataset.id = String(id);
+        pads.set(id, pad);
         matrix.appendChild(pad);
     }
 
-    for (let id = 91; id <= 98; id++) createPad(id);
-    createPad(null, true);
-    for (const row of rows) {
-        for (let column = 0; column < 8; column++) createPad(row.base + column);
-        createPad(row.scene);
+    for (const base of rows) {
+        for (let column = 0; column < 8; column++) createPad(base + column);
     }
 
-    const studioPadIds = new Set(rows.flatMap(({ base }) =>
+    const studioPadIds = new Set(rows.flatMap(base =>
         Array.from({ length: 8 }, (_, column) => base + column)
     ));
+    const omittedControlIds = new Set([
+        91, 92, 93, 94, 95, 96, 97, 98,
+        89, 79, 69, 59, 49, 39, 29, 19
+    ]);
     const lastSenderSequences = new Map();
     const sequencedSenders = new Set();
     function isFreshSenderMessage(data, stream) {
@@ -733,12 +729,14 @@ window.addEventListener('resize', () => {
             !isFreshSenderMessage(data, 'midi')
         ) return;
         const pad = pads.get(data.id);
-        if (!pad) return;
+        if (!pad && !omittedControlIds.has(data.id)) return;
         const sceneControl = data.id >= 91 && data.id <= 94;
-        pad.classList.toggle(
-            'pressed',
-            data.isDown && !sceneControl && data.animationControlsLight !== true
-        );
+        if (pad) {
+            pad.classList.toggle(
+                'pressed',
+                data.isDown && !sceneControl
+            );
+        }
         if (data.isDown) {
             prependKeyMessage(`LP:"BTN${data.id}"`);
             if (data.id === 91) startLoadingSequence();
@@ -773,6 +771,22 @@ window.addEventListener('resize', () => {
         if (data?.type === 'clear-animation') {
             if (!isFreshSenderMessage(data, 'led')) return;
             pads.forEach(pad => pad.classList.remove('animated'));
+            return;
+        }
+        if (data?.type === 'pending-blink-frame') {
+            if (
+                !Array.isArray(data.padIds) ||
+                !data.padIds.every(id => Number.isInteger(id) && studioPadIds.has(id)) ||
+                typeof data.isOn !== 'boolean' ||
+                !isFreshSenderMessage(data, 'led')
+            ) return;
+            const blinkingPads = new Set(data.padIds);
+            studioPadIds.forEach(id => {
+                const pad = pads.get(id);
+                const isBlinking = blinkingPads.has(id);
+                pad.classList.toggle('pending-blink', isBlinking);
+                pad.classList.toggle('pending-blink-on', isBlinking && data.isOn);
+            });
             return;
         }
         if (
