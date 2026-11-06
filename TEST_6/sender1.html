@@ -350,11 +350,6 @@
             background: #f46404;
         }
 
-        #studio-audio-file {
-            min-width: 0;
-            flex: 1;
-        }
-
         #studio-keyframes {
             display: grid;
             gap: 10px;
@@ -377,54 +372,31 @@
             font-weight: 700;
         }
 
-        .animation-frame-header button {
-            min-height: 34px !important;
-            padding: 6px 9px !important;
-        }
-
         .animation-frame-header span {
             color: #f46404;
         }
 
-        .animation-playback-settings {
-            display: grid;
-            gap: 10px;
-            margin: 10px 0;
-            padding: 10px;
-            border: 1px solid var(--studio-border);
-            border-radius: 4px;
-            background: #202020;
-        }
-
-        .animation-duration-control {
-            display: grid;
-            grid-template-columns: 1fr auto;
-            gap: 7px 10px;
-            align-items: center;
-        }
-
-        .animation-duration-control input {
-            grid-column: 1 / -1;
-            width: 100%;
-            min-height: 18px !important;
-            margin: 0;
-            accent-color: #f46404;
-        }
-
-        #studio-animation-loop {
-            width: 18px;
-            height: 18px;
-            margin: 0;
-            accent-color: #f46404;
-        }
-
-        .animation-playback-settings .label-loop {
+        .animation-speed-control {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 8px;
+            gap: 12px;
+            margin: 8px 0;
+            color: var(--studio-muted);
+        }
+
+        .animation-speed-control label {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
             margin: 0;
             cursor: pointer;
+        }
+
+        .animation-speed-control input {
+            width: 14px;
+            min-height: 14px !important;
+            margin: 0;
+            accent-color: #f46404;
         }
 
         .frame-matrix {
@@ -533,7 +505,7 @@
             <div class="studio-selection">
                 <span id="studio-selection-count" aria-live="polite">No button selected</span>
             </div>
-            <p class="studio-hint">Select a button to edit its animation. Existing animations load automatically; changes apply to that button right away. Choose a sample or preset to assign it. Saving by name is optional.</p>
+            <p class="studio-hint">Select a button to edit its animation. Existing animations load automatically; changes apply to that button right away. Map sounds to Launchpad buttons in the Looper page.</p>
 
             <section class="studio-section">
                 <h3>1. Create a light animation</h3>
@@ -555,25 +527,20 @@
                         <option value="studio-preset:8">Studio preset: Full Grid Flash</option>
                     </select>
                 </div>
-                <div class="animation-playback-settings">
-                    <label class="animation-duration-control" for="studio-animation-duration">
-                        <span>Total animation time</span>
-                        <output id="studio-animation-duration-value" for="studio-animation-duration">1200 ms</output>
-                        <input id="studio-animation-duration" type="range" min="0" max="3000" step="10" value="1200">
+                <p id="studio-animation-timing" class="studio-hint">1 frame per beat at 140 BPM (about 429 ms per frame).</p>
+                <div class="animation-speed-control" aria-label="Animation speed">
+                    <span>Speed</span>
+                    <label for="studio-animation-speed-2">
+                        <input id="studio-animation-speed-2" type="checkbox">
+                        ×2
                     </label>
-                    <label class="studio-selection label-loop">
-                        <span>Loop while pressed</span>
-                        <input id="studio-animation-loop" type="checkbox">
-                    </label>
-                    <label class="studio-selection label-loop">
-                        <span>Toggle loop on each press</span>
-                        <input id="studio-animation-toggle-loop" type="checkbox">
+                    <label for="studio-animation-speed-4">
+                        <input id="studio-animation-speed-4" type="checkbox">
+                        ×4
                     </label>
                 </div>
-                <p class="studio-hint">Choose one loop mode. Toggle mode keeps the trigger button lit and looping after release; press it again to stop.</p>
                 <div id="studio-keyframes" aria-label="Animation frames"></div>
                 <div class="studio-row">
-                    <button id="studio-add-keyframe" type="button">＋ Add frame</button>
                     <button id="studio-play-animation" type="button">▶ Preview</button>
                 </div>
                 <p class="studio-hint">Optional: save these frames by name to reuse them later.</p>
@@ -586,19 +553,8 @@
             <hr class="studio-divider">
 
             <section class="studio-section">
-                <h3>2. Add a sound</h3>
-                <p class="studio-hint">Choose an audio file for the last button you tapped above.</p>
-                <div class="studio-row">
-                    <input id="studio-audio-file" type="file" accept="audio/*" aria-label="Choose an audio file">
-                    <button id="studio-clear-audio" type="button" title="Clear audio from the selected button">Clear</button>
-                </div>
-            </section>
-
-            <hr class="studio-divider">
-
-            <section class="studio-section">
-                <h3>3. Save a full preset</h3>
-                <p class="studio-hint">Save all button animations, sounds, and the current frame editor together.</p>
+                <h3>2. Save animations</h3>
+                <p class="studio-hint">Save button animations and the current frame editor together.</p>
                 <div class="studio-row">
                     <input id="studio-preset-name" type="text" maxlength="60" placeholder="Preset name" aria-label="Preset name">
                     <button id="studio-save-preset" class="studio-button-primary" type="button">Save preset</button>
@@ -618,6 +574,9 @@
     <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <script>
         const ledPublisherId = `sender1-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const looperChannel = typeof BroadcastChannel === 'function'
+            ? new BroadcastChannel('launchpad-looper')
+            : null;
         const ablyClient = new Ably.Realtime({
             key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
             clientId: ledPublisherId
@@ -625,6 +584,7 @@
         const midiChannel = ablyClient.channels.get("launchpad");
         let ledMessageSequence = 0;
         const ORANGE_LED = 9;
+        const WHITE_LED = 3;
         const rows = [{
                 base: 81,
                 scene: 89
@@ -708,6 +668,9 @@
         );
         const launchpadGridPadIds = new Set(loadingSnakePadIds);
         const remoteAnimationLitPads = new Set();
+        const pendingBlinkPads = new Set();
+        let pendingBlinkTimer = null;
+        let pendingBlinkOn = false;
         let receivedRemoteAnimationFrame = false;
         let loadingSnakeStepDuration = 120;
         let loadingSnakeStartedAt = 0;
@@ -818,13 +781,68 @@
                 receivedRemoteAnimationFrame = true;
             }
             for (const id of remoteAnimationLitPads) {
-                if (!nextLitPads.has(id)) sendLed(id, 0, undefined, false);
+                if (!nextLitPads.has(id) && !pendingBlinkPads.has(id)) {
+                    sendLed(id, 0, undefined, false);
+                }
             }
             for (const id of nextLitPads) {
-                if (!remoteAnimationLitPads.has(id)) sendLed(id, ORANGE_LED, undefined, false);
+                if (!remoteAnimationLitPads.has(id) && !pendingBlinkPads.has(id)) {
+                    sendLed(id, ORANGE_LED, undefined, false);
+                }
             }
             remoteAnimationLitPads.clear();
             nextLitPads.forEach(id => remoteAnimationLitPads.add(id));
+        }
+
+        function publishPendingBlinkFrame() {
+            midiChannel.publish('led', {
+                type: 'pending-blink-frame',
+                senderId: ledPublisherId,
+                sequence: ++ledMessageSequence,
+                padIds: [...pendingBlinkPads],
+                isOn: pendingBlinkOn
+            }).catch(error => {
+                console.error('Failed to publish Launchpad pending blink state:', error);
+            });
+        }
+
+        function setPendingBlinkPads(nextPadIds) {
+            const nextPads = new Set(nextPadIds);
+            const removedPads = [...pendingBlinkPads].filter(id => !nextPads.has(id));
+            const addedPads = [...nextPads].filter(id => !pendingBlinkPads.has(id));
+
+            pendingBlinkPads.clear();
+            nextPads.forEach(id => pendingBlinkPads.add(id));
+
+            for (const id of removedPads) {
+                sendLed(
+                    id,
+                    animationLitPads.has(id) || remoteAnimationLitPads.has(id)
+                        ? ORANGE_LED
+                        : sceneLedStates.get(id) ?? 0,
+                    undefined,
+                    false
+                );
+            }
+            if (addedPads.length) {
+                pendingBlinkOn = true;
+                addedPads.forEach(id => sendLed(id, WHITE_LED, undefined, false));
+            }
+            publishPendingBlinkFrame();
+
+            if (pendingBlinkPads.size && pendingBlinkTimer === null) {
+                pendingBlinkTimer = window.setInterval(() => {
+                    pendingBlinkOn = !pendingBlinkOn;
+                    pendingBlinkPads.forEach(id => {
+                        sendLed(id, pendingBlinkOn ? WHITE_LED : 0, undefined, false);
+                    });
+                    publishPendingBlinkFrame();
+                }, 250);
+            } else if (!pendingBlinkPads.size && pendingBlinkTimer !== null) {
+                window.clearInterval(pendingBlinkTimer);
+                pendingBlinkTimer = null;
+                pendingBlinkOn = false;
+            }
         }
 
         midiChannel.subscribe('led', message => {
@@ -866,6 +884,7 @@
             pressedPads.add(id);
             pads.get(id)?.classList.add('active');
             if (!padAnimations.has(id)) sendLed(id, ORANGE_LED, undefined, false);
+            sendLooperMessage({ type: 'launchpad-input', id, isDown: true });
             midiChannel.publish('midi', {
                 id,
                 isDown: true,
@@ -881,6 +900,7 @@
             if (!padAnimations.has(id)) {
                 sendLed(id, sceneLedStates.get(id) ?? 0, undefined, false);
             }
+            sendLooperMessage({ type: 'launchpad-input', id, isDown: false });
             midiChannel.publish('midi', {
                 id,
                 isDown: false,
@@ -888,10 +908,6 @@
                 senderId: ledPublisherId,
                 sequence: ++ledMessageSequence
             });
-            const animation = activeAnimations.get(id);
-            if (animation?.settings.loop && !animation.settings.toggleLoop) {
-                stopAnimationPlayback(id);
-            }
         }
 
         async function setLaunchpadPresence(isConnected) {
@@ -938,7 +954,6 @@
                     : 'None';
             if (isDown) {
                 pressPad(id);
-                if (id !== 92 && id !== 93) playStudioPad(id, { triggerId: id });
             } else {
                 releasePad(id);
             }
@@ -1015,12 +1030,13 @@
         const studioKeyframes = document.getElementById('studio-keyframes');
         const studioStatus = document.getElementById('studio-status');
         const padAnimations = new Map();
-        const padAudio = new Map();
-        const audioUrls = new Map();
-        const activeAudioPlaybacks = new Map();
+        const remoteLooperActivePadIds = new Set();
         let editorFrames = [];
         const activeAnimations = new Map();
         const previewAnimationKey = 'preview';
+        const ANIMATION_FRAME_COUNT = 24;
+        let looperBpm = 140;
+        const padAnimationSpeeds = new Map();
         const animationLitPads = new Set();
         let selectedPadId = null;
         let activeStudioPreset = null;
@@ -1030,6 +1046,12 @@
         const allStudioPadIds = Array.from({ length: 8 }, (_, row) =>
             Array.from({ length: 8 }, (_, column) => (8 - row) * 10 + column + 1)
         ).flat();
+
+        function sendLooperMessage(message) {
+            if (looperChannel) {
+                looperChannel.postMessage({ ...message, senderId: ledPublisherId });
+            }
+        }
         const sampleAnimations = (() => {
             const square = (minRow, maxRow, minColumn, maxColumn) =>
                 allStudioPadIds.filter(id => {
@@ -1067,49 +1089,101 @@
             studioStatus.textContent = message;
         }
 
+        function normalizeAnimationSpeed(speed) {
+            return [1, 2, 4].includes(Number(speed)) ? Number(speed) : 1;
+        }
+
+        function getPadAnimationSpeed(id) {
+            return normalizeAnimationSpeed(padAnimationSpeeds.get(id));
+        }
+
+        function getAnimationFrameDuration(speedMultiplier = 1) {
+            return 60000 / looperBpm / speedMultiplier;
+        }
+
+        function updateAnimationTimingLabel() {
+            const speedMultiplier = selectedPadId === null ? 1 : getPadAnimationSpeed(selectedPadId);
+            const frameDuration = getAnimationFrameDuration(speedMultiplier);
+            document.getElementById('studio-animation-timing').textContent =
+                `${speedMultiplier} frame${speedMultiplier === 1 ? '' : 's'} per beat at ${looperBpm} BPM (about ${Math.round(frameDuration)} ms per frame).`;
+        }
+
+        function syncAnimationSpeedControls() {
+            const speed2 = document.getElementById('studio-animation-speed-2');
+            const speed4 = document.getElementById('studio-animation-speed-4');
+            const speedMultiplier = selectedPadId === null ? 1 : getPadAnimationSpeed(selectedPadId);
+            speed2.checked = speedMultiplier === 2;
+            speed4.checked = speedMultiplier === 4;
+            speed2.disabled = selectedPadId === null;
+            speed4.disabled = selectedPadId === null;
+            updateAnimationTimingLabel();
+        }
+
+        function retimeActiveAnimations(padId = null, speedMultiplier = null) {
+            activeAnimations.forEach((animation, animationKey) => {
+                if (padId !== null && animationKey !== padId) return;
+                if (speedMultiplier !== null) animation.speedMultiplier = speedMultiplier;
+                const frameDuration = getAnimationFrameDuration(animation.speedMultiplier);
+                const elapsed = performance.now() - animation.frameStartedAt;
+                const elapsedRatio = Math.min(1, elapsed / animation.frameDuration);
+                animation.frameDuration = frameDuration;
+                window.clearTimeout(animation.timer);
+                animation.timer = window.setTimeout(
+                    animation.advanceFrame,
+                    frameDuration * (1 - elapsedRatio)
+                );
+            });
+        }
+
+        function updateAnimationSpeed() {
+            if (selectedPadId === null) {
+                syncAnimationSpeedControls();
+                return;
+            }
+            const speedMultiplier = document.getElementById('studio-animation-speed-4').checked
+                ? 4
+                : document.getElementById('studio-animation-speed-2').checked ? 2 : 1;
+            padAnimationSpeeds.set(selectedPadId, speedMultiplier);
+            syncAnimationSpeedControls();
+            retimeActiveAnimations(selectedPadId, speedMultiplier);
+            scheduleWorkspaceSave();
+        }
+
+        function syncLooperTempo(data) {
+            if (!Number.isFinite(data.bpm) || data.bpm < 60 || data.bpm > 180) return;
+            if (data.bpm === looperBpm) return;
+            looperBpm = data.bpm;
+            retimeActiveAnimations();
+            updateAnimationTimingLabel();
+        }
+
         function normalizeFrames(frames, legacyPadId) {
-            if (!Array.isArray(frames)) return [];
-            if (frames.every(frame =>
-                Array.isArray(frame.lit) && (frame.duration === undefined || Number.isFinite(frame.duration))
-            )) {
-                return frames.map(frame => ({
-                    duration: Math.max(20, Math.min(10000, Math.round(frame.duration || 250))),
+            const blankFrames = () => Array.from(
+                { length: ANIMATION_FRAME_COUNT },
+                () => ({ lit: [] })
+            );
+            if (!Array.isArray(frames) || !frames.length) return blankFrames();
+
+            let sourceFrames;
+            if (frames.every(frame => frame && Array.isArray(frame.lit))) {
+                sourceFrames = frames.map(frame => ({
                     lit: [...new Set(frame.lit.map(Number).filter(id => allStudioPadIds.includes(id)))]
                 }));
-            }
-            if (frames.every(frame => Number.isFinite(frame.time) && Number.isFinite(frame.level))) {
-                return frames.map((frame, index) => ({
-                    duration: Math.max(20, Math.min(10000, Math.round(
-                        (frames[index + 1]?.time ?? frame.time + 250) - frame.time
-                    ))),
+            } else if (frames.every(frame =>
+                frame && Number.isFinite(frame.time) && Number.isFinite(frame.level)
+            )) {
+                sourceFrames = frames.map(frame => ({
                     lit: frame.level >= 0.5
                         ? (legacyPadId ? [legacyPadId] : [...allStudioPadIds])
                         : []
                 }));
+            } else {
+                return blankFrames();
             }
-            return [];
-        }
 
-        function readPlaybackSettings() {
-            return {
-                duration: Number(document.getElementById('studio-animation-duration').value),
-                loop: document.getElementById('studio-animation-loop').checked,
-                toggleLoop: document.getElementById('studio-animation-toggle-loop').checked
-            };
-        }
-
-        function normalizeAnimationDuration(value, fallback = 1200) {
-            const duration = Number(value);
-            return Math.max(0, Math.min(3000, Number.isFinite(duration) ? duration : fallback));
-        }
-
-        function setPlaybackSettings(settings = {}) {
-            const duration = normalizeAnimationDuration(settings.duration);
-            const durationSlider = document.getElementById('studio-animation-duration');
-            durationSlider.value = String(duration);
-            document.getElementById('studio-animation-duration-value').value = `${duration} ms`;
-            document.getElementById('studio-animation-loop').checked = Boolean(settings.loop);
-            document.getElementById('studio-animation-toggle-loop').checked = Boolean(settings.toggleLoop);
+            return Array.from({ length: ANIMATION_FRAME_COUNT }, (_, index) => ({
+                lit: sourceFrames[Math.floor(index * sourceFrames.length / ANIMATION_FRAME_COUNT)].lit
+            }));
         }
 
         function updateSelectedAnimation() {
@@ -1118,7 +1192,7 @@
                 return;
             }
             const frames = readAnimationFrames();
-            if (!frames.length) {
+            if (!frames.some(frame => frame.lit.length)) {
                 padAnimations.delete(selectedPadId);
                 scheduleWorkspaceSave();
                 setStudioStatus(`Animation cleared from button ${selectedPadId}.`);
@@ -1126,8 +1200,7 @@
             }
             padAnimations.set(selectedPadId, {
                 frames: frames.map(frame => ({ lit: [...frame.lit] })),
-                animationSource: document.getElementById('studio-animation').value,
-                ...readPlaybackSettings()
+                animationSource: document.getElementById('studio-animation').value
             });
             scheduleWorkspaceSave();
         }
@@ -1135,19 +1208,11 @@
         function normalizeAnimationAssignment(value, id) {
             if (Array.isArray(value)) {
                 const frames = normalizeFrames(value, id);
-                return {
-                    frames,
-                    duration: normalizeAnimationDuration(frames.reduce((sum, frame) => sum + frame.duration, 0)),
-                    loop: false,
-                    toggleLoop: false
-                };
+                return { frames };
             }
             if (!value || !Array.isArray(value.frames)) return null;
             return {
                 frames: normalizeFrames(value.frames, id),
-                duration: normalizeAnimationDuration(value.duration),
-                loop: Boolean(value.loop),
-                toggleLoop: Boolean(value.toggleLoop),
                 animationSource: typeof value.animationSource === 'string' ? value.animationSource : null
             };
         }
@@ -1241,7 +1306,7 @@
                 default:
                     return [];
             }
-            return sequence.length ? sequence : [{ lit: [centerId] }];
+            return normalizeFrames(sequence.length ? sequence : [{ lit: [centerId] }], null);
         }
 
         function renderEditorFrames() {
@@ -1253,18 +1318,7 @@
                 header.className = 'animation-frame-header';
                 const label = document.createElement('span');
                 label.textContent = `Frame ${frameIndex + 1}`;
-                const remove = document.createElement('button');
-                remove.type = 'button';
-                remove.textContent = 'Remove';
-                remove.setAttribute('aria-label', `Remove frame ${frameIndex + 1}`);
-                remove.addEventListener('click', () => {
-                    activeStudioPreset = null;
-                    document.getElementById('studio-animation').value = 'custom';
-                    editorFrames.splice(frameIndex, 1);
-                    renderEditorFrames();
-                    updateSelectedAnimation();
-                });
-                header.append(label, remove);
+                header.append(label);
                 const frameMatrix = document.createElement('div');
                 frameMatrix.className = 'frame-matrix';
                 frameMatrix.setAttribute('aria-label', `Frame ${frameIndex + 1} light matrix`);
@@ -1356,10 +1410,14 @@
                 animation.lit.forEach(id => nextLitPads.add(id));
             });
             for (const id of animationLitPads) {
-                if (!nextLitPads.has(id)) sendLed(id, 0, undefined, false);
+                if (!nextLitPads.has(id) && !pendingBlinkPads.has(id)) {
+                    sendLed(id, 0, undefined, false);
+                }
             }
             for (const id of nextLitPads) {
-                if (!animationLitPads.has(id)) sendLed(id, ORANGE_LED, undefined, false);
+                if (!animationLitPads.has(id) && !pendingBlinkPads.has(id)) {
+                    sendLed(id, ORANGE_LED, undefined, false);
+                }
             }
             animationLitPads.clear();
             nextLitPads.forEach(id => animationLitPads.add(id));
@@ -1389,7 +1447,7 @@
             applyAnimationFrame();
         }
 
-        function playAnimationOnGrid(frames, settings, triggerId = null) {
+        function playAnimationOnGrid(frames, triggerId = null, keepLooping = false) {
             const animationKey = triggerId ?? previewAnimationKey;
             if (!frames.length) {
                 stopAnimationPlayback(animationKey);
@@ -1398,21 +1456,21 @@
             stopAnimationPlayback(animationKey);
             const animation = {
                 frames,
-                settings,
-                triggerId,
-                frameDuration: Math.max(1, settings.duration / frames.length),
+                speedMultiplier: Number.isInteger(animationKey) ? getPadAnimationSpeed(animationKey) : 1,
+                frameDuration: getAnimationFrameDuration(
+                    Number.isInteger(animationKey) ? getPadAnimationSpeed(animationKey) : 1
+                ),
+                frameStartedAt: 0,
                 frameIndex: 0,
                 lit: new Set(),
-                timer: null
+                timer: null,
+                advanceFrame: null
             };
             activeAnimations.set(animationKey, animation);
             function showNextFrame() {
                 if (activeAnimations.get(animationKey) !== animation) return;
                 if (animation.frameIndex >= frames.length) {
-                    if (
-                        settings.toggleLoop ||
-                        (settings.loop && (triggerId === null || hardwarePressedPads.has(triggerId)))
-                    ) {
+                    if (keepLooping) {
                         animation.frameIndex = 0;
                     } else {
                         activeAnimations.delete(animationKey);
@@ -1423,53 +1481,72 @@
                 animation.lit = new Set(frames[animation.frameIndex].lit);
                 animation.frameIndex++;
                 applyAnimationFrame();
+                animation.frameStartedAt = performance.now();
                 animation.timer = window.setTimeout(showNextFrame, animation.frameDuration);
             }
+            animation.advanceFrame = showNextFrame;
             showNextFrame();
         }
 
-        function playStudioPad(id, { triggerId = null } = {}) {
+        function playStudioPad(id) {
             const pad = studioGrid.querySelector(`[data-id="${id}"]`);
             if (!pad) return;
             const assignment = normalizeAnimationAssignment(padAnimations.get(id), id);
-            if (assignment) {
+            if (!assignment) {
+                if (remoteLooperActivePadIds.has(id)) stopAnimationPlayback(id);
+                return;
+            }
+            const looperDriven = remoteLooperActivePadIds.has(id);
+            if (looperDriven) {
+                playAnimationOnGrid(assignment.frames, id, true);
+                return;
+            }
+            playAnimationOnGrid(assignment.frames);
+        }
+
+        function syncLooperAnimationState(data) {
+            syncLooperTempo(data);
+            if (!Array.isArray(data.pads)) return;
+            const activeIds = new Set();
+            const pendingStartIds = new Set();
+            const pendingStopIds = new Set();
+            for (const pad of data.pads) {
                 if (
-                    triggerId !== null &&
-                    activeAnimations.get(triggerId)?.settings.toggleLoop
-                ) {
-                    stopAnimationPlayback(triggerId);
-                    return;
+                    !pad ||
+                    !Number.isInteger(pad.launchpadId) ||
+                    !allStudioPadIds.includes(pad.launchpadId)
+                ) continue;
+                if (pad.state === 'PENDING_START') {
+                    pendingStartIds.add(pad.launchpadId);
+                } else if (pad.state === 'PLAYING' || pad.state === 'PENDING_STOP') {
+                    activeIds.add(pad.launchpadId);
                 }
-                playAnimationOnGrid(assignment.frames, assignment, triggerId);
+                if (pad.state === 'PENDING_STOP') {
+                    pendingStopIds.add(pad.launchpadId);
+                }
             }
-            const clip = padAudio.get(id);
-            if (clip) {
-                let url = audioUrls.get(id);
-                if (!url) {
-                    url = URL.createObjectURL(clip.blob);
-                    audioUrls.set(id, url);
-                }
-                const animationKey = triggerId ?? previewAnimationKey;
-                const previousAudio = activeAudioPlaybacks.get(id);
-                if (previousAudio) {
-                    previousAudio.pause();
-                    previousAudio.currentTime = 0;
-                }
-                const audio = new Audio(url);
-                activeAudioPlaybacks.set(id, audio);
-                audio.addEventListener('ended', () => {
-                    if (activeAudioPlaybacks.get(id) !== audio) return;
-                    activeAudioPlaybacks.delete(id);
-                    stopAnimationPlayback(animationKey);
-                }, { once: true });
-                audio.play().catch(error => {
-                    if (activeAudioPlaybacks.get(id) === audio) {
-                        activeAudioPlaybacks.delete(id);
-                        stopAnimationPlayback(animationKey);
-                    }
-                    setStudioStatus(`Audio playback failed: ${error.message}`);
-                });
+
+            for (const id of remoteLooperActivePadIds) {
+                if (!activeIds.has(id)) stopAnimationPlayback(id);
             }
+            const newlyActiveIds = [...activeIds].filter(id => !remoteLooperActivePadIds.has(id));
+            remoteLooperActivePadIds.clear();
+            activeIds.forEach(id => remoteLooperActivePadIds.add(id));
+            newlyActiveIds.forEach(id => playStudioPad(id));
+            pendingStartIds.forEach(id => pendingStopIds.add(id));
+            setPendingBlinkPads(pendingStopIds);
+        }
+
+        if (looperChannel) {
+            looperChannel.addEventListener('message', event => {
+                if (event.data?.type === 'looper-state') {
+                    syncLooperAnimationState(event.data);
+                }
+            });
+            sendLooperMessage({ type: 'sender-ready' });
+            window.setTimeout(() => sendLooperMessage({ type: 'sender-ready' }), 500);
+        } else {
+            console.error('Cross-page audio control requires BroadcastChannel support.');
         }
 
         function assignAnimationToPad(id, pad) {
@@ -1477,19 +1554,16 @@
             const frames = presetMatch
                 ? createStudioPresetFrames(id, Number(presetMatch[1]))
                 : readAnimationFrames();
-            if (!frames.length) {
-                setStudioStatus('Add at least one frame before assigning an animation.');
+            if (!frames.some(frame => frame.lit.length)) {
+                setStudioStatus('Light at least one pad in the animation before assigning it.');
                 return;
             }
             if (presetMatch) {
                 editorFrames = frames.map(frame => ({ lit: [...frame.lit] }));
                 renderEditorFrames();
             }
-            const settings = readPlaybackSettings();
             padAnimations.set(id, {
                 frames: frames.map(frame => ({ lit: [...frame.lit] })),
-                duration: settings.duration,
-                loop: settings.loop,
                 animationSource: document.getElementById('studio-animation').value
             });
             scheduleWorkspaceSave();
@@ -1497,6 +1571,7 @@
             pad.classList.add('selected');
             selectedPadId = id;
             document.getElementById('studio-selection-count').textContent = `Button ${id} selected`;
+            syncAnimationSpeedControls();
             playStudioPad(id);
             setStudioStatus(`Animation applied to button ${id}. Changes apply automatically.`);
         }
@@ -1506,11 +1581,11 @@
             pad.classList.add('selected');
             selectedPadId = id;
             document.getElementById('studio-selection-count').textContent = `Button ${id} selected`;
+            syncAnimationSpeedControls();
 
             const assignment = normalizeAnimationAssignment(padAnimations.get(id), id);
             if (assignment) {
                 editorFrames = assignment.frames.map(frame => ({ lit: [...frame.lit] }));
-                setPlaybackSettings(assignment);
                 const source = assignment.animationSource;
                 const animationSelect = document.getElementById('studio-animation');
                 animationSelect.value = source && [...animationSelect.options].some(option => option.value === source)
@@ -1527,9 +1602,9 @@
             const animationSelect = document.getElementById('studio-animation');
             activeStudioPreset = null;
             animationSelect.value = 'custom';
-            editorFrames = [];
+            editorFrames = normalizeFrames([], null);
             renderEditorFrames();
-            setStudioStatus(`Button ${id} selected. Choose an animation or add frames to create one.`);
+            setStudioStatus(`Button ${id} selected. Choose an animation or paint its 24 frames.`);
             scheduleWorkspaceSave();
         }
 
@@ -1558,85 +1633,32 @@
                         return;
                     }
                     editorFrames = normalizeFrames(animation.frames, null);
-                    setPlaybackSettings(animation);
                     renderEditorFrames();
                     updateSelectedAnimation();
                     setStudioStatus(`Animation "${animation.label}" loaded.`);
                 }).catch(error => setStudioStatus(`Could not load animation: ${error.message}`));
             } else {
                 activeStudioPreset = null;
-                editorFrames = [];
+                editorFrames = normalizeFrames([], null);
                 renderEditorFrames();
             }
         });
-        document.getElementById('studio-add-keyframe').addEventListener('click', () => {
-            activeStudioPreset = null;
-            document.getElementById('studio-animation').value = 'custom';
-            const previous = editorFrames[editorFrames.length - 1];
-            editorFrames.push({ lit: previous ? [...previous.lit] : [] });
-            renderEditorFrames();
-            updateSelectedAnimation();
-        });
         document.getElementById('studio-play-animation').addEventListener('click', () => {
-            playAnimationOnGrid(readAnimationFrames(), readPlaybackSettings());
+            playAnimationOnGrid(readAnimationFrames());
         });
-        document.getElementById('studio-animation-duration').addEventListener('input', event => {
-            document.getElementById('studio-animation-duration-value').value = `${event.target.value} ms`;
-            updateSelectedAnimation();
-        });
-        document.getElementById('studio-animation-loop').addEventListener('change', event => {
+        document.getElementById('studio-animation-speed-2').addEventListener('change', event => {
             if (event.target.checked) {
-                document.getElementById('studio-animation-toggle-loop').checked = false;
+                document.getElementById('studio-animation-speed-4').checked = false;
             }
-            const activeAnimation = activeAnimations.get(selectedPadId) ??
-                activeAnimations.get(previewAnimationKey);
-            if (activeAnimation) {
-                activeAnimation.settings.loop = event.target.checked;
-                activeAnimation.settings.toggleLoop = false;
-            }
-            updateSelectedAnimation();
+            updateAnimationSpeed();
         });
-        document.getElementById('studio-animation-toggle-loop').addEventListener('change', event => {
+        document.getElementById('studio-animation-speed-4').addEventListener('change', event => {
             if (event.target.checked) {
-                document.getElementById('studio-animation-loop').checked = false;
+                document.getElementById('studio-animation-speed-2').checked = false;
             }
-            const activeAnimation = activeAnimations.get(selectedPadId) ??
-                activeAnimations.get(previewAnimationKey);
-            if (activeAnimation) {
-                activeAnimation.settings.toggleLoop = event.target.checked;
-                activeAnimation.settings.loop = false;
-            }
-            updateSelectedAnimation();
+            updateAnimationSpeed();
         });
-        document.getElementById('studio-audio-file').addEventListener('change', event => {
-            const file = event.target.files[0];
-            if (!file) return;
-            if (selectedPadId === null) {
-                setStudioStatus('Click a button above first to choose where to assign audio.');
-                event.target.value = '';
-                return;
-            }
-            padAudio.set(selectedPadId, { name: file.name, type: file.type, blob: file });
-            const oldUrl = audioUrls.get(selectedPadId);
-            if (oldUrl) URL.revokeObjectURL(oldUrl);
-            audioUrls.delete(selectedPadId);
-            scheduleWorkspaceSave();
-            setStudioStatus(`Audio assigned to button ${selectedPadId}.`);
-            event.target.value = '';
-        });
-        document.getElementById('studio-clear-audio').addEventListener('click', () => {
-            if (selectedPadId === null) {
-                setStudioStatus('Click a button above first to choose which audio to clear.');
-                return;
-            }
-            padAudio.delete(selectedPadId);
-            const url = audioUrls.get(selectedPadId);
-            if (url) URL.revokeObjectURL(url);
-            audioUrls.delete(selectedPadId);
-            scheduleWorkspaceSave();
-            setStudioStatus(`Audio cleared from button ${selectedPadId}.`);
-        });
-
+        syncAnimationSpeedControls();
         function openPresetDatabase() {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open('launchpad-studio-presets', 1);
@@ -1664,11 +1686,10 @@
                 name: 'workspace:autosave',
                 type: 'workspace',
                 animations: [...padAnimations],
-                audio: [...padAudio],
+                animationSpeeds: [...padAnimationSpeeds],
                 selectedPadId,
                 editorAnimation: document.getElementById('studio-animation').value,
-                editorFrames: readAnimationFrames(),
-                ...readPlaybackSettings()
+                editorFrames: readAnimationFrames()
             };
         }
 
@@ -1687,13 +1708,16 @@
             const workspace = await runPresetTransaction('readonly', store => store.get('workspace:autosave'));
             if (!workspace) return;
             padAnimations.clear();
+            padAnimationSpeeds.clear();
             (workspace.animations || []).forEach(([id, animation]) => {
                 const assignment = normalizeAnimationAssignment(animation, Number(id));
                 if (assignment) padAnimations.set(Number(id), assignment);
             });
-            padAudio.clear();
-            (workspace.audio || []).forEach(([id, clip]) => padAudio.set(Number(id), clip));
-
+            (workspace.animationSpeeds || []).forEach(([id, speed]) => {
+                if (allStudioPadIds.includes(Number(id))) {
+                    padAnimationSpeeds.set(Number(id), normalizeAnimationSpeed(speed));
+                }
+            });
             const animationSelect = document.getElementById('studio-animation');
             const savedAnimation = workspace.editorAnimation || 'custom';
             animationSelect.value = [...animationSelect.options].some(option => option.value === savedAnimation)
@@ -1703,7 +1727,6 @@
                 ? animationSelect.value
                 : null;
             editorFrames = normalizeFrames(workspace.editorFrames, null);
-            setPlaybackSettings(workspace);
             renderEditorFrames();
 
             const selectedId = Number(workspace.selectedPadId);
@@ -1712,7 +1735,8 @@
                 studioGrid.querySelector(`[data-id="${selectedId}"]`)?.classList.add('selected');
                 document.getElementById('studio-selection-count').textContent = `Button ${selectedId} selected`;
             }
-            setStudioStatus('Your button animations and sounds have been restored.');
+            syncAnimationSpeedControls();
+            setStudioStatus('Your button animations have been restored.');
         }
 
         async function refreshPresetList() {
@@ -1746,7 +1770,7 @@
                 setStudioStatus('Enter a name for this animation.');
                 return;
             }
-            if (!frames.length) {
+            if (!frames.some(frame => frame.lit.length)) {
                 setStudioStatus('Draw at least one frame before saving the animation.');
                 return;
             }
@@ -1754,14 +1778,13 @@
                 name: `animation:${label}`,
                 type: 'animation',
                 label,
-                frames,
-                ...readPlaybackSettings()
+                frames
             };
             try {
                 await runPresetTransaction('readwrite', store => store.put(animation));
                 await refreshPresetList();
                 document.getElementById('studio-animation').value = animation.name;
-                setStudioStatus(`Animation "${label}" saved. Use Save preset to save sounds and button assignments too.`);
+                setStudioStatus(`Animation "${label}" saved. Use Save preset to save button assignments too.`);
             } catch (error) {
                 setStudioStatus(`Could not save animation: ${error.message}`);
             }
@@ -1778,16 +1801,15 @@
                 type: 'preset',
                 label: name,
                 animations: [...padAnimations].map(([id, frames]) => [id, frames]),
-                audio: [...padAudio].map(([id, clip]) => [id, clip]),
+                animationSpeeds: [...padAnimationSpeeds],
                 editorAnimation: document.getElementById('studio-animation').value,
-                editorFrames: readAnimationFrames(),
-                ...readPlaybackSettings()
+                editorFrames: readAnimationFrames()
             };
             try {
                 await runPresetTransaction('readwrite', store => store.put(preset));
                 await refreshPresetList();
                 document.getElementById('studio-presets').value = preset.name;
-                setStudioStatus(`Preset "${name}" saved on this page.`);
+                setStudioStatus(`Animation preset "${name}" saved on this page.`);
             } catch (error) {
                 setStudioStatus(`Could not save preset: ${error.message}`);
             }
@@ -1806,14 +1828,16 @@
                     return;
                 }
                 padAnimations.clear();
+                padAnimationSpeeds.clear();
                 (preset.animations || []).forEach(([id, animation]) => {
                     const assignment = normalizeAnimationAssignment(animation, Number(id));
                     if (assignment) padAnimations.set(Number(id), assignment);
                 });
-                padAudio.clear();
-                (preset.audio || []).forEach(([id, clip]) => padAudio.set(Number(id), clip));
-                audioUrls.forEach(url => URL.revokeObjectURL(url));
-                audioUrls.clear();
+                (preset.animationSpeeds || []).forEach(([id, speed]) => {
+                    if (allStudioPadIds.includes(Number(id))) {
+                        padAnimationSpeeds.set(Number(id), normalizeAnimationSpeed(speed));
+                    }
+                });
                 const animationSelect = document.getElementById('studio-animation');
                 const storedAnimation = preset.editorAnimation || 'custom';
                 if (![...animationSelect.options].some(option => option.value === storedAnimation)) {
@@ -1825,8 +1849,8 @@
                     ? storedAnimation
                     : null;
                 editorFrames = normalizeFrames(preset.editorFrames, null);
-                setPlaybackSettings(preset);
                 renderEditorFrames();
+                syncAnimationSpeedControls();
                 scheduleWorkspaceSave();
                 setStudioStatus(`Preset "${preset.label || name.replace(/^preset:/, '')}" loaded.`);
             } catch (error) {
@@ -1856,8 +1880,7 @@
             event.currentTarget.setAttribute('aria-label', minimized ? 'Expand studio' : 'Minimize studio');
         });
 
-        editorFrames = [{ lit: [] }];
-        setPlaybackSettings();
+        editorFrames = normalizeFrames([], null);
         renderEditorFrames();
         openPresetDatabase().then(async () => {
             await refreshPresetList();
@@ -1868,6 +1891,12 @@
 
         window.addEventListener('pagehide', () => {
             window.clearTimeout(workspaceSaveTimer);
+            if (pendingBlinkTimer !== null) {
+                window.clearInterval(pendingBlinkTimer);
+                pendingBlinkTimer = null;
+                pendingBlinkPads.forEach(id => sendLed(id, 0, undefined, false));
+                pendingBlinkPads.clear();
+            }
             if (!presetDatabase) return;
             try {
                 presetDatabase.transaction('presets', 'readwrite')
