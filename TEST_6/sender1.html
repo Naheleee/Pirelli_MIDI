@@ -562,10 +562,15 @@
                         <input id="studio-animation-duration" type="range" min="0" max="3000" step="10" value="1200">
                     </label>
                     <label class="studio-selection label-loop">
-                        <span>Loop while button is held</span>
+                        <span>Loop while pressed</span>
                         <input id="studio-animation-loop" type="checkbox">
                     </label>
+                    <label class="studio-selection label-loop">
+                        <span>Toggle loop on each press</span>
+                        <input id="studio-animation-toggle-loop" type="checkbox">
+                    </label>
                 </div>
+                <p class="studio-hint">Choose one loop mode. Toggle mode keeps the trigger button lit and looping after release; press it again to stop.</p>
                 <div id="studio-keyframes" aria-label="Animation frames"></div>
                 <div class="studio-row">
                     <button id="studio-add-keyframe" type="button">＋ Add frame</button>
@@ -860,10 +865,11 @@
             if (pressedPads.has(id)) return;
             pressedPads.add(id);
             pads.get(id)?.classList.add('active');
-            sendLed(id, ORANGE_LED, undefined, false);
+            if (!padAnimations.has(id)) sendLed(id, ORANGE_LED, undefined, false);
             midiChannel.publish('midi', {
                 id,
                 isDown: true,
+                animationControlsLight: padAnimations.has(id),
                 senderId: ledPublisherId,
                 sequence: ++ledMessageSequence
             });
@@ -872,14 +878,20 @@
         function releasePad(id) {
             if (!pressedPads.delete(id)) return;
             pads.get(id)?.classList.remove('active');
-            sendLed(id, sceneLedStates.get(id) ?? 0, undefined, false);
+            if (!padAnimations.has(id)) {
+                sendLed(id, sceneLedStates.get(id) ?? 0, undefined, false);
+            }
             midiChannel.publish('midi', {
                 id,
                 isDown: false,
+                animationControlsLight: padAnimations.has(id),
                 senderId: ledPublisherId,
                 sequence: ++ledMessageSequence
             });
-            if (animationTriggerId === id) stopAnimationPlayback();
+            const animation = activeAnimations.get(id);
+            if (animation?.settings.loop && !animation.settings.toggleLoop) {
+                stopAnimationPlayback(id);
+            }
         }
 
         async function setLaunchpadPresence(isConnected) {
@@ -914,8 +926,12 @@
             }
 
             if (!pads.has(id)) return;
-            if (isDown) hardwarePressedPads.add(id);
-            else hardwarePressedPads.delete(id);
+            if (isDown) {
+                if (hardwarePressedPads.has(id)) return;
+                hardwarePressedPads.add(id);
+            } else {
+                hardwarePressedPads.delete(id);
+            }
             document.getElementById('pressed-buttons-value').textContent =
                 hardwarePressedPads.size
                     ? [...hardwarePressedPads].sort((a, b) => a - b).join(' · ')
@@ -1001,9 +1017,10 @@
         const padAnimations = new Map();
         const padAudio = new Map();
         const audioUrls = new Map();
+        const activeAudioPlaybacks = new Map();
         let editorFrames = [];
-        let animationRunId = 0;
-        let animationTriggerId = null;
+        const activeAnimations = new Map();
+        const previewAnimationKey = 'preview';
         const animationLitPads = new Set();
         let selectedPadId = null;
         let activeStudioPreset = null;
@@ -1076,7 +1093,8 @@
         function readPlaybackSettings() {
             return {
                 duration: Number(document.getElementById('studio-animation-duration').value),
-                loop: document.getElementById('studio-animation-loop').checked
+                loop: document.getElementById('studio-animation-loop').checked,
+                toggleLoop: document.getElementById('studio-animation-toggle-loop').checked
             };
         }
 
@@ -1091,6 +1109,7 @@
             durationSlider.value = String(duration);
             document.getElementById('studio-animation-duration-value').value = `${duration} ms`;
             document.getElementById('studio-animation-loop').checked = Boolean(settings.loop);
+            document.getElementById('studio-animation-toggle-loop').checked = Boolean(settings.toggleLoop);
         }
 
         function updateSelectedAnimation() {
@@ -1119,7 +1138,8 @@
                 return {
                     frames,
                     duration: normalizeAnimationDuration(frames.reduce((sum, frame) => sum + frame.duration, 0)),
-                    loop: false
+                    loop: false,
+                    toggleLoop: false
                 };
             }
             if (!value || !Array.isArray(value.frames)) return null;
@@ -1127,6 +1147,7 @@
                 frames: normalizeFrames(value.frames, id),
                 duration: normalizeAnimationDuration(value.duration),
                 loop: Boolean(value.loop),
+                toggleLoop: Boolean(value.toggleLoop),
                 animationSource: typeof value.animationSource === 'string' ? value.animationSource : null
             };
         }
@@ -1329,8 +1350,11 @@
             [...studioGrid.querySelectorAll('.studio-pad')].map(pad => Number(pad.dataset.id))
         );
 
-        function applyAnimationFrame(litIds) {
-            const nextLitPads = new Set(litIds);
+        function applyAnimationFrame() {
+            const nextLitPads = new Set();
+            activeAnimations.forEach(animation => {
+                animation.lit.forEach(id => nextLitPads.add(id));
+            });
             for (const id of animationLitPads) {
                 if (!nextLitPads.has(id)) sendLed(id, 0, undefined, false);
             }
@@ -1352,41 +1376,54 @@
             });
         }
 
-        function stopAnimationPlayback() {
-            animationRunId++;
-            animationTriggerId = null;
-            applyAnimationFrame([]);
+        function stopAnimationPlayback(triggerId = null) {
+            if (triggerId === null) {
+                activeAnimations.forEach(animation => window.clearTimeout(animation.timer));
+                activeAnimations.clear();
+            } else {
+                const animation = activeAnimations.get(triggerId);
+                if (!animation) return;
+                window.clearTimeout(animation.timer);
+                activeAnimations.delete(triggerId);
+            }
+            applyAnimationFrame();
         }
 
         function playAnimationOnGrid(frames, settings, triggerId = null) {
-            const runId = ++animationRunId;
+            const animationKey = triggerId ?? previewAnimationKey;
             if (!frames.length) {
-                animationTriggerId = null;
-                applyAnimationFrame([]);
+                stopAnimationPlayback(animationKey);
                 return;
             }
-            const frameDuration = Math.max(1, settings.duration / frames.length);
-            const shouldLoop = settings.loop && triggerId !== null;
-            animationTriggerId = shouldLoop ? triggerId : null;
-            let frameIndex = 0;
+            stopAnimationPlayback(animationKey);
+            const animation = {
+                frames,
+                settings,
+                triggerId,
+                frameDuration: Math.max(1, settings.duration / frames.length),
+                frameIndex: 0,
+                lit: new Set(),
+                timer: null
+            };
+            activeAnimations.set(animationKey, animation);
             function showNextFrame() {
-                if (runId !== animationRunId) return;
-                const frame = frames[frameIndex];
-                applyAnimationFrame(frame.lit);
-                frameIndex++;
-                if (frameIndex < frames.length) {
-                    window.setTimeout(showNextFrame, frameDuration);
-                } else if (shouldLoop && hardwarePressedPads.has(triggerId)) {
-                    frameIndex = 0;
-                    window.setTimeout(showNextFrame, frameDuration);
-                } else {
-                    window.setTimeout(() => {
-                        if (runId === animationRunId) {
-                            animationTriggerId = null;
-                            applyAnimationFrame([]);
-                        }
-                    }, frameDuration);
+                if (activeAnimations.get(animationKey) !== animation) return;
+                if (animation.frameIndex >= frames.length) {
+                    if (
+                        settings.toggleLoop ||
+                        (settings.loop && (triggerId === null || hardwarePressedPads.has(triggerId)))
+                    ) {
+                        animation.frameIndex = 0;
+                    } else {
+                        activeAnimations.delete(animationKey);
+                        applyAnimationFrame();
+                        return;
+                    }
                 }
+                animation.lit = new Set(frames[animation.frameIndex].lit);
+                animation.frameIndex++;
+                applyAnimationFrame();
+                animation.timer = window.setTimeout(showNextFrame, animation.frameDuration);
             }
             showNextFrame();
         }
@@ -1396,6 +1433,13 @@
             if (!pad) return;
             const assignment = normalizeAnimationAssignment(padAnimations.get(id), id);
             if (assignment) {
+                if (
+                    triggerId !== null &&
+                    activeAnimations.get(triggerId)?.settings.toggleLoop
+                ) {
+                    stopAnimationPlayback(triggerId);
+                    return;
+                }
                 playAnimationOnGrid(assignment.frames, assignment, triggerId);
             }
             const clip = padAudio.get(id);
@@ -1405,8 +1449,26 @@
                     url = URL.createObjectURL(clip.blob);
                     audioUrls.set(id, url);
                 }
+                const animationKey = triggerId ?? previewAnimationKey;
+                const previousAudio = activeAudioPlaybacks.get(id);
+                if (previousAudio) {
+                    previousAudio.pause();
+                    previousAudio.currentTime = 0;
+                }
                 const audio = new Audio(url);
-                audio.play().catch(error => setStudioStatus(`Audio playback failed: ${error.message}`));
+                activeAudioPlaybacks.set(id, audio);
+                audio.addEventListener('ended', () => {
+                    if (activeAudioPlaybacks.get(id) !== audio) return;
+                    activeAudioPlaybacks.delete(id);
+                    stopAnimationPlayback(animationKey);
+                }, { once: true });
+                audio.play().catch(error => {
+                    if (activeAudioPlaybacks.get(id) === audio) {
+                        activeAudioPlaybacks.delete(id);
+                        stopAnimationPlayback(animationKey);
+                    }
+                    setStudioStatus(`Audio playback failed: ${error.message}`);
+                });
             }
         }
 
@@ -1522,7 +1584,30 @@
             document.getElementById('studio-animation-duration-value').value = `${event.target.value} ms`;
             updateSelectedAnimation();
         });
-        document.getElementById('studio-animation-loop').addEventListener('change', updateSelectedAnimation);
+        document.getElementById('studio-animation-loop').addEventListener('change', event => {
+            if (event.target.checked) {
+                document.getElementById('studio-animation-toggle-loop').checked = false;
+            }
+            const activeAnimation = activeAnimations.get(selectedPadId) ??
+                activeAnimations.get(previewAnimationKey);
+            if (activeAnimation) {
+                activeAnimation.settings.loop = event.target.checked;
+                activeAnimation.settings.toggleLoop = false;
+            }
+            updateSelectedAnimation();
+        });
+        document.getElementById('studio-animation-toggle-loop').addEventListener('change', event => {
+            if (event.target.checked) {
+                document.getElementById('studio-animation-loop').checked = false;
+            }
+            const activeAnimation = activeAnimations.get(selectedPadId) ??
+                activeAnimations.get(previewAnimationKey);
+            if (activeAnimation) {
+                activeAnimation.settings.toggleLoop = event.target.checked;
+                activeAnimation.settings.loop = false;
+            }
+            updateSelectedAnimation();
+        });
         document.getElementById('studio-audio-file').addEventListener('change', event => {
             const file = event.target.files[0];
             if (!file) return;
