@@ -350,11 +350,6 @@
             background: #f46404;
         }
 
-        #studio-audio-file {
-            min-width: 0;
-            flex: 1;
-        }
-
         #studio-keyframes {
             display: grid;
             gap: 10px;
@@ -533,7 +528,7 @@
             <div class="studio-selection">
                 <span id="studio-selection-count" aria-live="polite">No button selected</span>
             </div>
-            <p class="studio-hint">Select a button to edit its animation. Existing animations load automatically; changes apply to that button right away. Choose a sample or preset to assign it. Saving by name is optional.</p>
+            <p class="studio-hint">Select a button to edit its animation. Existing animations load automatically; changes apply to that button right away. Map sounds to Launchpad buttons in the Looper page.</p>
 
             <section class="studio-section">
                 <h3>1. Create a light animation</h3>
@@ -562,15 +557,15 @@
                         <input id="studio-animation-duration" type="range" min="0" max="3000" step="10" value="1200">
                     </label>
                     <label class="studio-selection label-loop">
-                        <span>Loop while pressed</span>
+                        <span>Loop preview</span>
                         <input id="studio-animation-loop" type="checkbox">
                     </label>
                     <label class="studio-selection label-loop">
-                        <span>Toggle loop on each press</span>
+                        <span>Toggle loop in preview</span>
                         <input id="studio-animation-toggle-loop" type="checkbox">
                     </label>
                 </div>
-                <p class="studio-hint">Choose one loop mode. Toggle mode keeps the trigger button lit and looping after release; press it again to stop.</p>
+                <p class="studio-hint">These settings control the studio preview. Animations triggered by the Looper follow its audio playback.</p>
                 <div id="studio-keyframes" aria-label="Animation frames"></div>
                 <div class="studio-row">
                     <button id="studio-add-keyframe" type="button">＋ Add frame</button>
@@ -586,19 +581,8 @@
             <hr class="studio-divider">
 
             <section class="studio-section">
-                <h3>2. Add a sound</h3>
-                <p class="studio-hint">Choose an audio file for the last button you tapped above.</p>
-                <div class="studio-row">
-                    <input id="studio-audio-file" type="file" accept="audio/*" aria-label="Choose an audio file">
-                    <button id="studio-clear-audio" type="button" title="Clear audio from the selected button">Clear</button>
-                </div>
-            </section>
-
-            <hr class="studio-divider">
-
-            <section class="studio-section">
-                <h3>3. Save a full preset</h3>
-                <p class="studio-hint">Save all button animations, sounds, and the current frame editor together.</p>
+                <h3>2. Save animations</h3>
+                <p class="studio-hint">Save button animations and the current frame editor together.</p>
                 <div class="studio-row">
                     <input id="studio-preset-name" type="text" maxlength="60" placeholder="Preset name" aria-label="Preset name">
                     <button id="studio-save-preset" class="studio-button-primary" type="button">Save preset</button>
@@ -618,6 +602,9 @@
     <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <script>
         const ledPublisherId = `sender1-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const looperChannel = typeof BroadcastChannel === 'function'
+            ? new BroadcastChannel('launchpad-looper')
+            : null;
         const ablyClient = new Ably.Realtime({
             key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
             clientId: ledPublisherId
@@ -625,6 +612,7 @@
         const midiChannel = ablyClient.channels.get("launchpad");
         let ledMessageSequence = 0;
         const ORANGE_LED = 9;
+        const WHITE_LED = 63;
         const rows = [{
                 base: 81,
                 scene: 89
@@ -708,6 +696,9 @@
         );
         const launchpadGridPadIds = new Set(loadingSnakePadIds);
         const remoteAnimationLitPads = new Set();
+        const pendingStopBlinkPads = new Set();
+        let pendingStopBlinkTimer = null;
+        let pendingStopBlinkOn = false;
         let receivedRemoteAnimationFrame = false;
         let loadingSnakeStepDuration = 120;
         let loadingSnakeStartedAt = 0;
@@ -818,13 +809,54 @@
                 receivedRemoteAnimationFrame = true;
             }
             for (const id of remoteAnimationLitPads) {
-                if (!nextLitPads.has(id)) sendLed(id, 0, undefined, false);
+                if (!nextLitPads.has(id) && !pendingStopBlinkPads.has(id)) {
+                    sendLed(id, 0, undefined, false);
+                }
             }
             for (const id of nextLitPads) {
-                if (!remoteAnimationLitPads.has(id)) sendLed(id, ORANGE_LED, undefined, false);
+                if (!remoteAnimationLitPads.has(id) && !pendingStopBlinkPads.has(id)) {
+                    sendLed(id, ORANGE_LED, undefined, false);
+                }
             }
             remoteAnimationLitPads.clear();
             nextLitPads.forEach(id => remoteAnimationLitPads.add(id));
+        }
+
+        function setPendingStopBlinkPads(nextPadIds) {
+            const nextPads = new Set(nextPadIds);
+            const removedPads = [...pendingStopBlinkPads].filter(id => !nextPads.has(id));
+            const addedPads = [...nextPads].filter(id => !pendingStopBlinkPads.has(id));
+
+            pendingStopBlinkPads.clear();
+            nextPads.forEach(id => pendingStopBlinkPads.add(id));
+
+            for (const id of removedPads) {
+                sendLed(
+                    id,
+                    animationLitPads.has(id) || remoteAnimationLitPads.has(id)
+                        ? ORANGE_LED
+                        : sceneLedStates.get(id) ?? 0,
+                    undefined,
+                    false
+                );
+            }
+            if (addedPads.length) {
+                pendingStopBlinkOn = true;
+                addedPads.forEach(id => sendLed(id, WHITE_LED, undefined, false));
+            }
+
+            if (pendingStopBlinkPads.size && pendingStopBlinkTimer === null) {
+                pendingStopBlinkTimer = window.setInterval(() => {
+                    pendingStopBlinkOn = !pendingStopBlinkOn;
+                    pendingStopBlinkPads.forEach(id => {
+                        sendLed(id, pendingStopBlinkOn ? WHITE_LED : 0, undefined, false);
+                    });
+                }, 250);
+            } else if (!pendingStopBlinkPads.size && pendingStopBlinkTimer !== null) {
+                window.clearInterval(pendingStopBlinkTimer);
+                pendingStopBlinkTimer = null;
+                pendingStopBlinkOn = false;
+            }
         }
 
         midiChannel.subscribe('led', message => {
@@ -866,6 +898,7 @@
             pressedPads.add(id);
             pads.get(id)?.classList.add('active');
             if (!padAnimations.has(id)) sendLed(id, ORANGE_LED, undefined, false);
+            sendLooperMessage({ type: 'launchpad-input', id, isDown: true });
             midiChannel.publish('midi', {
                 id,
                 isDown: true,
@@ -881,6 +914,7 @@
             if (!padAnimations.has(id)) {
                 sendLed(id, sceneLedStates.get(id) ?? 0, undefined, false);
             }
+            sendLooperMessage({ type: 'launchpad-input', id, isDown: false });
             midiChannel.publish('midi', {
                 id,
                 isDown: false,
@@ -889,7 +923,11 @@
                 sequence: ++ledMessageSequence
             });
             const animation = activeAnimations.get(id);
-            if (animation?.settings.loop && !animation.settings.toggleLoop) {
+            if (
+                !remoteLooperActivePadIds.has(id) &&
+                animation?.settings.loop &&
+                !animation.settings.toggleLoop
+            ) {
                 stopAnimationPlayback(id);
             }
         }
@@ -938,7 +976,6 @@
                     : 'None';
             if (isDown) {
                 pressPad(id);
-                if (id !== 92 && id !== 93) playStudioPad(id, { triggerId: id });
             } else {
                 releasePad(id);
             }
@@ -1015,9 +1052,7 @@
         const studioKeyframes = document.getElementById('studio-keyframes');
         const studioStatus = document.getElementById('studio-status');
         const padAnimations = new Map();
-        const padAudio = new Map();
-        const audioUrls = new Map();
-        const activeAudioPlaybacks = new Map();
+        const remoteLooperActivePadIds = new Set();
         let editorFrames = [];
         const activeAnimations = new Map();
         const previewAnimationKey = 'preview';
@@ -1030,6 +1065,12 @@
         const allStudioPadIds = Array.from({ length: 8 }, (_, row) =>
             Array.from({ length: 8 }, (_, column) => (8 - row) * 10 + column + 1)
         ).flat();
+
+        function sendLooperMessage(message) {
+            if (looperChannel) {
+                looperChannel.postMessage({ ...message, senderId: ledPublisherId });
+            }
+        }
         const sampleAnimations = (() => {
             const square = (minRow, maxRow, minColumn, maxColumn) =>
                 allStudioPadIds.filter(id => {
@@ -1356,10 +1397,14 @@
                 animation.lit.forEach(id => nextLitPads.add(id));
             });
             for (const id of animationLitPads) {
-                if (!nextLitPads.has(id)) sendLed(id, 0, undefined, false);
+                if (!nextLitPads.has(id) && !pendingStopBlinkPads.has(id)) {
+                    sendLed(id, 0, undefined, false);
+                }
             }
             for (const id of nextLitPads) {
-                if (!animationLitPads.has(id)) sendLed(id, ORANGE_LED, undefined, false);
+                if (!animationLitPads.has(id) && !pendingStopBlinkPads.has(id)) {
+                    sendLed(id, ORANGE_LED, undefined, false);
+                }
             }
             animationLitPads.clear();
             nextLitPads.forEach(id => animationLitPads.add(id));
@@ -1389,7 +1434,7 @@
             applyAnimationFrame();
         }
 
-        function playAnimationOnGrid(frames, settings, triggerId = null) {
+        function playAnimationOnGrid(frames, settings, triggerId = null, keepLooping = false) {
             const animationKey = triggerId ?? previewAnimationKey;
             if (!frames.length) {
                 stopAnimationPlayback(animationKey);
@@ -1411,7 +1456,8 @@
                 if (animation.frameIndex >= frames.length) {
                     if (
                         settings.toggleLoop ||
-                        (settings.loop && (triggerId === null || hardwarePressedPads.has(triggerId)))
+                        (settings.loop && (triggerId === null || hardwarePressedPads.has(triggerId))) ||
+                        keepLooping
                     ) {
                         animation.frameIndex = 0;
                     } else {
@@ -1432,44 +1478,68 @@
             const pad = studioGrid.querySelector(`[data-id="${id}"]`);
             if (!pad) return;
             const assignment = normalizeAnimationAssignment(padAnimations.get(id), id);
-            if (assignment) {
+            if (!assignment) {
+                if (remoteLooperActivePadIds.has(id)) stopAnimationPlayback(id);
+                return;
+            }
+            const looperDriven = remoteLooperActivePadIds.has(id);
+            if (looperDriven) {
+                playAnimationOnGrid(
+                    assignment.frames,
+                    { ...assignment, loop: true, toggleLoop: false },
+                    id,
+                    true
+                );
+                return;
+            }
+            if (
+                triggerId !== null &&
+                activeAnimations.get(triggerId)?.settings.toggleLoop
+            ) {
+                stopAnimationPlayback(triggerId);
+                return;
+            }
+            playAnimationOnGrid(assignment.frames, assignment, triggerId);
+        }
+
+        function syncLooperAnimationState(data) {
+            if (!Array.isArray(data.pads)) return;
+            const activeIds = new Set();
+            const pendingStopIds = new Set();
+            for (const pad of data.pads) {
                 if (
-                    triggerId !== null &&
-                    activeAnimations.get(triggerId)?.settings.toggleLoop
-                ) {
-                    stopAnimationPlayback(triggerId);
-                    return;
+                    !pad ||
+                    !Number.isInteger(pad.launchpadId) ||
+                    !allStudioPadIds.includes(pad.launchpadId)
+                ) continue;
+                if (pad.state === 'PLAYING' || pad.state === 'PENDING_STOP') {
+                    activeIds.add(pad.launchpadId);
                 }
-                playAnimationOnGrid(assignment.frames, assignment, triggerId);
+                if (pad.state === 'PENDING_STOP') {
+                    pendingStopIds.add(pad.launchpadId);
+                }
             }
-            const clip = padAudio.get(id);
-            if (clip) {
-                let url = audioUrls.get(id);
-                if (!url) {
-                    url = URL.createObjectURL(clip.blob);
-                    audioUrls.set(id, url);
-                }
-                const animationKey = triggerId ?? previewAnimationKey;
-                const previousAudio = activeAudioPlaybacks.get(id);
-                if (previousAudio) {
-                    previousAudio.pause();
-                    previousAudio.currentTime = 0;
-                }
-                const audio = new Audio(url);
-                activeAudioPlaybacks.set(id, audio);
-                audio.addEventListener('ended', () => {
-                    if (activeAudioPlaybacks.get(id) !== audio) return;
-                    activeAudioPlaybacks.delete(id);
-                    stopAnimationPlayback(animationKey);
-                }, { once: true });
-                audio.play().catch(error => {
-                    if (activeAudioPlaybacks.get(id) === audio) {
-                        activeAudioPlaybacks.delete(id);
-                        stopAnimationPlayback(animationKey);
-                    }
-                    setStudioStatus(`Audio playback failed: ${error.message}`);
-                });
+
+            for (const id of remoteLooperActivePadIds) {
+                if (!activeIds.has(id)) stopAnimationPlayback(id);
             }
+            const newlyActiveIds = [...activeIds].filter(id => !remoteLooperActivePadIds.has(id));
+            remoteLooperActivePadIds.clear();
+            activeIds.forEach(id => remoteLooperActivePadIds.add(id));
+            newlyActiveIds.forEach(id => playStudioPad(id));
+            setPendingStopBlinkPads(pendingStopIds);
+        }
+
+        if (looperChannel) {
+            looperChannel.addEventListener('message', event => {
+                if (event.data?.type === 'looper-state') {
+                    syncLooperAnimationState(event.data);
+                }
+            });
+            sendLooperMessage({ type: 'sender-ready' });
+            window.setTimeout(() => sendLooperMessage({ type: 'sender-ready' }), 500);
+        } else {
+            console.error('Cross-page audio control requires BroadcastChannel support.');
         }
 
         function assignAnimationToPad(id, pad) {
@@ -1608,35 +1678,6 @@
             }
             updateSelectedAnimation();
         });
-        document.getElementById('studio-audio-file').addEventListener('change', event => {
-            const file = event.target.files[0];
-            if (!file) return;
-            if (selectedPadId === null) {
-                setStudioStatus('Click a button above first to choose where to assign audio.');
-                event.target.value = '';
-                return;
-            }
-            padAudio.set(selectedPadId, { name: file.name, type: file.type, blob: file });
-            const oldUrl = audioUrls.get(selectedPadId);
-            if (oldUrl) URL.revokeObjectURL(oldUrl);
-            audioUrls.delete(selectedPadId);
-            scheduleWorkspaceSave();
-            setStudioStatus(`Audio assigned to button ${selectedPadId}.`);
-            event.target.value = '';
-        });
-        document.getElementById('studio-clear-audio').addEventListener('click', () => {
-            if (selectedPadId === null) {
-                setStudioStatus('Click a button above first to choose which audio to clear.');
-                return;
-            }
-            padAudio.delete(selectedPadId);
-            const url = audioUrls.get(selectedPadId);
-            if (url) URL.revokeObjectURL(url);
-            audioUrls.delete(selectedPadId);
-            scheduleWorkspaceSave();
-            setStudioStatus(`Audio cleared from button ${selectedPadId}.`);
-        });
-
         function openPresetDatabase() {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open('launchpad-studio-presets', 1);
@@ -1664,7 +1705,6 @@
                 name: 'workspace:autosave',
                 type: 'workspace',
                 animations: [...padAnimations],
-                audio: [...padAudio],
                 selectedPadId,
                 editorAnimation: document.getElementById('studio-animation').value,
                 editorFrames: readAnimationFrames(),
@@ -1691,9 +1731,6 @@
                 const assignment = normalizeAnimationAssignment(animation, Number(id));
                 if (assignment) padAnimations.set(Number(id), assignment);
             });
-            padAudio.clear();
-            (workspace.audio || []).forEach(([id, clip]) => padAudio.set(Number(id), clip));
-
             const animationSelect = document.getElementById('studio-animation');
             const savedAnimation = workspace.editorAnimation || 'custom';
             animationSelect.value = [...animationSelect.options].some(option => option.value === savedAnimation)
@@ -1712,7 +1749,7 @@
                 studioGrid.querySelector(`[data-id="${selectedId}"]`)?.classList.add('selected');
                 document.getElementById('studio-selection-count').textContent = `Button ${selectedId} selected`;
             }
-            setStudioStatus('Your button animations and sounds have been restored.');
+            setStudioStatus('Your button animations have been restored.');
         }
 
         async function refreshPresetList() {
@@ -1761,7 +1798,7 @@
                 await runPresetTransaction('readwrite', store => store.put(animation));
                 await refreshPresetList();
                 document.getElementById('studio-animation').value = animation.name;
-                setStudioStatus(`Animation "${label}" saved. Use Save preset to save sounds and button assignments too.`);
+                setStudioStatus(`Animation "${label}" saved. Use Save preset to save button assignments too.`);
             } catch (error) {
                 setStudioStatus(`Could not save animation: ${error.message}`);
             }
@@ -1778,7 +1815,6 @@
                 type: 'preset',
                 label: name,
                 animations: [...padAnimations].map(([id, frames]) => [id, frames]),
-                audio: [...padAudio].map(([id, clip]) => [id, clip]),
                 editorAnimation: document.getElementById('studio-animation').value,
                 editorFrames: readAnimationFrames(),
                 ...readPlaybackSettings()
@@ -1787,7 +1823,7 @@
                 await runPresetTransaction('readwrite', store => store.put(preset));
                 await refreshPresetList();
                 document.getElementById('studio-presets').value = preset.name;
-                setStudioStatus(`Preset "${name}" saved on this page.`);
+                setStudioStatus(`Animation preset "${name}" saved on this page.`);
             } catch (error) {
                 setStudioStatus(`Could not save preset: ${error.message}`);
             }
@@ -1810,10 +1846,6 @@
                     const assignment = normalizeAnimationAssignment(animation, Number(id));
                     if (assignment) padAnimations.set(Number(id), assignment);
                 });
-                padAudio.clear();
-                (preset.audio || []).forEach(([id, clip]) => padAudio.set(Number(id), clip));
-                audioUrls.forEach(url => URL.revokeObjectURL(url));
-                audioUrls.clear();
                 const animationSelect = document.getElementById('studio-animation');
                 const storedAnimation = preset.editorAnimation || 'custom';
                 if (![...animationSelect.options].some(option => option.value === storedAnimation)) {
@@ -1868,6 +1900,12 @@
 
         window.addEventListener('pagehide', () => {
             window.clearTimeout(workspaceSaveTimer);
+            if (pendingStopBlinkTimer !== null) {
+                window.clearInterval(pendingStopBlinkTimer);
+                pendingStopBlinkTimer = null;
+                pendingStopBlinkPads.forEach(id => sendLed(id, 0, undefined, false));
+                pendingStopBlinkPads.clear();
+            }
             if (!presetDatabase) return;
             try {
                 presetDatabase.transaction('presets', 'readwrite')

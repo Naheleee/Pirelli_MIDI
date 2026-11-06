@@ -82,6 +82,9 @@
         <div class="max-w-5xl mx-auto flex justify-between items-center gap-4">
             <h1 class="text-lg font-semibold tracking-wide text-white">LOOPER</h1>
             <div class="flex items-center gap-2">
+                <button id="btn-connect-launchpad" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm transition-colors">
+                    Connect Launchpad
+                </button>
                 <button id="btn-master-start" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-sm transition-colors">
                     <i class="fa-solid fa-play mr-1"></i> Start
                 </button>
@@ -120,15 +123,17 @@
                         Loop length (beats):
                     </span>
                     <div class="flex gap-1">
-                        <button type="button" class="bar-len-btn px-3 py-2 rounded-md text-xs font-semibold transition-colors bg-slate-800 text-slate-300 hover:bg-slate-700" data-beats="4" aria-pressed="false">4</button>
+                        <button type="button" class="bar-len-btn px-3 py-2 rounded-md text-xs font-semibold transition-colors bg-cyan-500 text-slate-950" data-beats="4" aria-pressed="true">4</button>
                         <button type="button" class="bar-len-btn px-3 py-2 rounded-md text-xs font-semibold transition-colors bg-slate-800 text-slate-300 hover:bg-slate-700" data-beats="8" aria-pressed="false">8</button>
                         <button type="button" class="bar-len-btn px-3 py-2 rounded-md text-xs font-semibold transition-colors bg-slate-800 text-slate-300 hover:bg-slate-700" data-beats="16" aria-pressed="false">16</button>
-                        <button type="button" class="bar-len-btn px-3 py-2 rounded-md text-xs font-semibold transition-colors bg-cyan-500 text-slate-950" data-beats="24" aria-pressed="true">24</button>
+                        <button type="button" class="bar-len-btn px-3 py-2 rounded-md text-xs font-semibold transition-colors bg-slate-800 text-slate-300 hover:bg-slate-700" data-beats="24" aria-pressed="false">24</button>
                     </div>
                 </div>
             </div>
 
-            <p class="text-xs text-slate-500 sm:text-right">Pads start and stop on the next loop.</p>
+            <p class="text-xs text-slate-500 sm:text-right">Connect the Launchpad here to enable hardware input and unlock audio. Sounds start on the next loop boundary; open sender1 and connect its MIDI output for physical light animations.</p>
+            <p id="midi-status" class="text-xs text-slate-500 sm:col-span-2" role="status" aria-live="polite">Launchpad not connected.</p>
+            <p id="looper-link-status" class="text-xs text-slate-500 sm:col-span-2" role="status">Waiting for sender1…</p>
             <p id="audio-error" class="hidden text-sm text-red-400 sm:col-span-2" role="status"></p>
         </div>
 
@@ -168,6 +173,12 @@
                             <input type="file" id="file-pad-0" accept="audio/*" class="hidden">
                         </label>
                     </div>
+                    <label class="flex items-center gap-2 text-xs text-slate-400" for="select-launchpad-0">
+                        Launchpad button
+                        <select id="select-launchpad-0" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300">
+                            <option value="">Not mapped</option>
+                        </select>
+                    </label>
                 </div>
             </div>
 
@@ -204,6 +215,12 @@
                             <input type="file" id="file-pad-1" accept="audio/*" class="hidden">
                         </label>
                     </div>
+                    <label class="flex items-center gap-2 text-xs text-slate-400" for="select-launchpad-1">
+                        Launchpad button
+                        <select id="select-launchpad-1" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300">
+                            <option value="">Not mapped</option>
+                        </select>
+                    </label>
                 </div>
             </div>
 
@@ -240,6 +257,12 @@
                             <input type="file" id="file-pad-2" accept="audio/*" class="hidden">
                         </label>
                     </div>
+                    <label class="flex items-center gap-2 text-xs text-slate-400" for="select-launchpad-2">
+                        Launchpad button
+                        <select id="select-launchpad-2" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300">
+                            <option value="">Not mapped</option>
+                        </select>
+                    </label>
                 </div>
             </div>
 
@@ -276,6 +299,12 @@
                             <input type="file" id="file-pad-3" accept="audio/*" class="hidden">
                         </label>
                     </div>
+                    <label class="flex items-center gap-2 text-xs text-slate-400" for="select-launchpad-3">
+                        Launchpad button
+                        <select id="select-launchpad-3" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300">
+                            <option value="">Not mapped</option>
+                        </select>
+                    </label>
                 </div>
             </div>
 
@@ -286,7 +315,7 @@
     <script>
         let isEngineRunning = false;
         let bpm = 140;
-        let maxBeats = 24;
+        let maxBeats = 4;
         let engineStartPromise = null;
 
         // Tone.js Instruments & Synths
@@ -303,6 +332,170 @@
             { id: 2, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_1/SYNTH_3.wav', player: null, colorClass: 'yellow' },
             { id: 3, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_1/SYNTH_4.wav', player: null, colorClass: 'emerald' }
         ];
+        const LAUNCHPAD_MAPPING_STORAGE_KEY = 'looper-launchpad-mappings-v1';
+        const launchpadButtonIds = [
+            ...Array.from({ length: 8 }, (_, row) =>
+                Array.from({ length: 8 }, (_, column) => (8 - row) * 10 + column + 1)
+            ).flat(),
+            ...Array.from({ length: 8 }, (_, index) => 91 + index)
+        ];
+        const looperChannel = typeof BroadcastChannel === 'function'
+            ? new BroadcastChannel('launchpad-looper')
+            : null;
+        const launchpadPressedInputs = new Set();
+        const looperMidiSenderId = `looper-midi-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        let midiAccess = null;
+        let midiInput = null;
+        let midiConnectionEnabled = false;
+        let launchpadMappings = [11, 12, 13, 14];
+
+        function loadLaunchpadMappings() {
+            try {
+                const saved = JSON.parse(localStorage.getItem(LAUNCHPAD_MAPPING_STORAGE_KEY));
+                if (!Array.isArray(saved)) return launchpadMappings;
+                return pads.map(pad =>
+                    launchpadButtonIds.includes(saved[pad.id]) ? saved[pad.id] : null
+                );
+            } catch (error) {
+                console.error('Could not load Launchpad button mappings:', error);
+                return launchpadMappings;
+            }
+        }
+
+        function publishLooperState() {
+            if (!looperChannel) return;
+            looperChannel.postMessage({
+                type: 'looper-state',
+                pads: pads.map(pad => ({
+                    padId: pad.id,
+                    launchpadId: launchpadMappings[pad.id],
+                    state: pad.state
+                }))
+            });
+        }
+
+        async function handleLaunchpadInput(senderId, id, isDown) {
+            if (!Number.isInteger(id) || !launchpadButtonIds.includes(id)) return;
+            const inputKey = `${senderId}:${id}`;
+            if (!isDown) {
+                launchpadPressedInputs.delete(inputKey);
+                return;
+            }
+            if (launchpadPressedInputs.has(inputKey)) return;
+            launchpadPressedInputs.add(inputKey);
+
+            const matchedPads = pads.filter(pad => launchpadMappings[pad.id] === id);
+            for (const pad of matchedPads) {
+                await togglePadState(pad.id);
+            }
+        }
+
+        async function handleLooperMessage(data) {
+            if (!data || typeof data !== 'object') return;
+            if (data.type === 'sender-ready') {
+                document.getElementById('looper-link-status').textContent = 'Connected to sender1.';
+                publishLooperState();
+                return;
+            }
+            if (
+                data.type !== 'launchpad-input' ||
+                typeof data.senderId !== 'string' ||
+                typeof data.isDown !== 'boolean'
+            ) return;
+            if (midiInput) return;
+            await handleLaunchpadInput(data.senderId, data.id, data.isDown);
+        }
+
+        function handleMidiMessage(event) {
+            const [statusByte, number, velocity] = event.data;
+            const command = statusByte & 0xf0;
+            let id;
+            let isDown;
+            if (command === 0x90 || command === 0x80) {
+                id = number;
+                isDown = command === 0x90 && velocity > 0;
+            } else if (command === 0xb0 && number >= 104 && number <= 111) {
+                id = number - 13;
+                isDown = velocity > 0;
+            } else {
+                return;
+            }
+            void handleLaunchpadInput(looperMidiSenderId, id, isDown);
+        }
+
+        function updateMidiPorts() {
+            if (!midiAccess || !midiConnectionEnabled) return;
+            const inputs = [...midiAccess.inputs.values()];
+            const isLaunchpad = port => /launchpad|novation|\blp\b/i.test(port.name);
+            const nextInput = inputs.find(isLaunchpad) || inputs[0] || null;
+            if (midiInput && midiInput !== nextInput) midiInput.onmidimessage = null;
+            midiInput = nextInput;
+            if (midiInput) {
+                midiInput.onmidimessage = handleMidiMessage;
+                document.getElementById('midi-status').textContent =
+                    `Launchpad input connected: ${midiInput.name || 'MIDI device'}.`;
+                document.getElementById('btn-connect-launchpad').textContent = 'Disconnect Launchpad';
+            } else {
+                launchpadPressedInputs.clear();
+                document.getElementById('midi-status').textContent =
+                    'No MIDI input found. Connect the Launchpad and try again.';
+                document.getElementById('btn-connect-launchpad').textContent = 'Connect Launchpad';
+            }
+        }
+
+        async function connectLaunchpad() {
+            const button = document.getElementById('btn-connect-launchpad');
+            if (midiInput) {
+                midiInput.onmidimessage = null;
+                midiInput = null;
+                midiConnectionEnabled = false;
+                if (midiAccess) midiAccess.onstatechange = null;
+                launchpadPressedInputs.clear();
+                document.getElementById('midi-status').textContent = 'Launchpad disconnected.';
+                button.textContent = 'Connect Launchpad';
+                return;
+            }
+            if (!navigator.requestMIDIAccess) {
+                document.getElementById('midi-status').textContent =
+                    'Web MIDI is not supported by this browser.';
+                return;
+            }
+
+            button.disabled = true;
+            try {
+                const midiAccessPromise = navigator.requestMIDIAccess();
+                const audioStarted = await startEngine();
+                midiAccess = await midiAccessPromise;
+                midiConnectionEnabled = true;
+                midiAccess.onstatechange = updateMidiPorts;
+                updateMidiPorts();
+                if (!audioStarted) {
+                    document.getElementById('midi-status').textContent =
+                        'MIDI is connected, but audio did not start. Check the audio error above and press Start.';
+                } else if (!midiInput) {
+                    document.getElementById('midi-status').textContent =
+                        'Audio is ready. No MIDI input found; reconnect the Launchpad and try again.';
+                }
+            } catch (error) {
+                document.getElementById('midi-status').textContent =
+                    `Could not connect to Launchpad: ${error.message}`;
+                console.error('Unable to connect Launchpad MIDI input:', error);
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        if (looperChannel) {
+            looperChannel.addEventListener('message', event => {
+                void handleLooperMessage(event.data);
+            });
+        }
+        window.addEventListener('pagehide', () => {
+            pads.forEach(pad => {
+                pad.state = 'OFF';
+            });
+            publishLooperState();
+        });
 
         // Initialize Tone Synths
         function initToneInstruments() {
@@ -367,9 +560,11 @@
 
             syncEventId = Tone.Transport.scheduleRepeat((time) => {
                 currentBeat = 0;
+                let padStateChanged = false;
                 pads.forEach(pad => {
                     if (pad.state === 'PENDING_START') {
                         pad.state = 'PLAYING';
+                        padStateChanged = true;
                         if (pad.player && pad.player.loaded) {
                             pad.player.stop(time);
                             pad.player.start(time);
@@ -377,13 +572,15 @@
                         Tone.Draw.schedule(() => updatePadUI(pad.id), time);
                     } else if (pad.state === 'PENDING_STOP') {
                         pad.state = 'OFF';
+                        padStateChanged = true;
                         if (pad.player) {
                             pad.player.stop(time);
                         }
                         Tone.Draw.schedule(() => updatePadUI(pad.id), time);
                     }
                 });
-            }, `${loopDuration}s`);
+                if (padStateChanged) publishLooperState();
+            }, `${loopDuration}s`, `${Math.max(0.001, loopDuration - 0.01)}s`);
 
             beatEventId = Tone.Transport.scheduleRepeat((time) => {
                 const beatIndex = currentBeat;
@@ -542,6 +739,7 @@
             badge.innerText = state.badge;
             icon.className = `fa-solid ${state.icon} text-2xl`;
             label.innerText = state.label;
+            publishLooperState();
         }
 
         // Custom Sound File Loader for Tone.Player
@@ -570,6 +768,38 @@
 
         // Setup Event Listeners
         window.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('btn-connect-launchpad').addEventListener('click', connectLaunchpad);
+            launchpadMappings = loadLaunchpadMappings();
+            if (!looperChannel) {
+                document.getElementById('looper-link-status').textContent =
+                    'Cross-page control requires BroadcastChannel support in this browser.';
+            }
+            pads.forEach(pad => {
+                const mappingSelect = document.getElementById(`select-launchpad-${pad.id}`);
+                launchpadButtonIds.forEach(id => {
+                    mappingSelect.add(new Option(`Button ${id}`, String(id)));
+                });
+                mappingSelect.value = launchpadMappings[pad.id] === null
+                    ? ''
+                    : String(launchpadMappings[pad.id]);
+                mappingSelect.addEventListener('change', event => {
+                    const value = event.target.value;
+                    launchpadMappings[pad.id] = value === '' ? null : Number(value);
+                    try {
+                        localStorage.setItem(
+                            LAUNCHPAD_MAPPING_STORAGE_KEY,
+                            JSON.stringify(launchpadMappings)
+                        );
+                    } catch (error) {
+                        console.error('Could not save Launchpad button mappings:', error);
+                        document.getElementById('looper-link-status').textContent =
+                            `Could not save button mapping: ${error.message}`;
+                    }
+                    publishLooperState();
+                });
+            });
+            publishLooperState();
+
             document.querySelectorAll('.bar-len-btn').forEach(btn => {
                 btn.addEventListener('click', (event) => {
                     const selectedButton = event.currentTarget;
