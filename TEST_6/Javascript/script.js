@@ -23,6 +23,7 @@ window.addEventListener('handtracking-results', event => {
 
 const loadingOverlay = document.querySelector('.loading-overlay');
 const loadingFrame = loadingOverlay.querySelector('iframe');
+const loadingCompleteSound = document.querySelector('.loading-complete-sound');
 const vistaOverlay = document.querySelector('.vista-overlay');
 const vistaFrame = vistaOverlay.querySelector('iframe');
 const isLocalFilePage = window.location.protocol === 'file:';
@@ -35,6 +36,13 @@ const loadingCompletionHoldMs = 2000;
 let activeVista = null;
 let vista3ClosePending = false;
 let launchpadBlinkRequested = false;
+
+window.addEventListener('loading-overlay-dismissed', () => {
+    loadingCompleteSound.currentTime = 0;
+    loadingCompleteSound.play().catch(error => {
+        console.error('Failed to play loading completion sound:', error);
+    });
+});
 
 function publishLaunchpadLedState(id, velocity) {
     launchpadChannel.publish('led', { id, velocity }).catch(error => {
