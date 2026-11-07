@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Tone.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -146,7 +147,7 @@
                     <div>
                         <span class="text-[10px] font-orbitron tracking-widest uppercase text-cyan-400 font-bold">PAD 1</span>
                         <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-compact-disc text-cyan-400"></i> <span id="pad-name-0">BASE_1</span>
+                            <i class="fa-solid fa-compact-disc text-cyan-400"></i> <span id="pad-name-0">SYNTH_1_NAHELE</span>
                         </h2>
                     </div>
                     <span id="badge-status-0" class="pad-status">
@@ -162,7 +163,7 @@
                 <div class="flex flex-col gap-2 z-10">
                     <div class="flex gap-2">
                         <select id="select-sound-0" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-400">
-                            <option value="sample" selected>BASE_1.wav</option>
+                            <option value="sample" selected>SYNTH_1_NAHELE.wav</option>
                             <option value="kick">Synth Kick</option>
                             <option value="snare">Beat Snare / Clap</option>
                             <option value="hihat">Hi-Hat Pattern</option>
@@ -188,7 +189,7 @@
                     <div>
                         <span class="text-[10px] font-orbitron tracking-widest uppercase text-fuchsia-400 font-bold">PAD 2</span>
                         <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-compact-disc text-fuchsia-400"></i> <span id="pad-name-1">SYNTH_2</span>
+                            <i class="fa-solid fa-compact-disc text-fuchsia-400"></i> <span id="pad-name-1">SYNTH_2_(81)_RICCARDO</span>
                         </h2>
                     </div>
                     <span id="badge-status-1" class="pad-status">
@@ -204,7 +205,7 @@
                 <div class="flex flex-col gap-2 z-10">
                     <div class="flex gap-2">
                         <select id="select-sound-1" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-fuchsia-400">
-                            <option value="sample" selected>SYNTH_2.wav</option>
+                            <option value="sample" selected>SYNTH_2_(81)_RICCARDO.wav</option>
                             <option value="kick">Synth Kick</option>
                             <option value="snare">Beat Snare / Clap</option>
                             <option value="hihat">Hi-Hat Pattern</option>
@@ -230,7 +231,7 @@
                     <div>
                         <span class="text-[10px] font-orbitron tracking-widest uppercase text-yellow-400 font-bold">PAD 3</span>
                         <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-compact-disc text-yellow-400"></i> <span id="pad-name-2">SYNTH_6</span>
+                            <i class="fa-solid fa-compact-disc text-yellow-400"></i> <span id="pad-name-2">SYNTH_3_(85)_RICCARDO</span>
                         </h2>
                     </div>
                     <span id="badge-status-2" class="pad-status">
@@ -246,7 +247,7 @@
                 <div class="flex flex-col gap-2 z-10">
                     <div class="flex gap-2">
                         <select id="select-sound-2" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-yellow-400">
-                            <option value="sample" selected>SYNTH_6.wav</option>
+                            <option value="sample" selected>SYNTH_3_(85)_RICCARDO.wav</option>
                             <option value="kick">Synth Kick</option>
                             <option value="snare">Beat Snare / Clap</option>
                             <option value="hihat">Hi-Hat Pattern</option>
@@ -272,7 +273,7 @@
                     <div>
                         <span class="text-[10px] font-orbitron tracking-widest uppercase text-emerald-400 font-bold">PAD 4</span>
                         <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-compact-disc text-emerald-400"></i> <span id="pad-name-3">SYNTH_5</span>
+                            <i class="fa-solid fa-compact-disc text-emerald-400"></i> <span id="pad-name-3">KICK_1_RICCARDO</span>
                         </h2>
                     </div>
                     <span id="badge-status-3" class="pad-status">
@@ -288,7 +289,7 @@
                 <div class="flex flex-col gap-2 z-10">
                     <div class="flex gap-2">
                         <select id="select-sound-3" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-400">
-                            <option value="sample" selected>SYNTH_5.wav</option>
+                            <option value="sample" selected>KICK_1_RICCARDO.wav</option>
                             <option value="kick">Synth Kick</option>
                             <option value="snare">Beat Snare / Clap</option>
                             <option value="hihat">Hi-Hat Pattern</option>
@@ -314,7 +315,7 @@
                     <div>
                         <span class="text-[10px] font-orbitron tracking-widest uppercase text-cyan-400 font-bold">PAD 5</span>
                         <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-compact-disc text-cyan-400"></i> <span id="pad-name-4">SYNTH_4</span>
+                            <i class="fa-solid fa-compact-disc text-cyan-400"></i> <span id="pad-name-4">KICK_2_RICCARDO</span>
                         </h2>
                     </div>
                     <span id="badge-status-4" class="pad-status">OFF</span>
@@ -328,7 +329,7 @@
                 <div class="flex flex-col gap-2 z-10">
                     <div class="flex gap-2">
                         <select id="select-sound-4" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-400">
-                            <option value="sample" selected>SYNTH_4.wav</option>
+                            <option value="sample" selected>KICK_2_RICCARDO.wav</option>
                             <option value="kick">Synth Kick</option>
                             <option value="snare">Beat Snare / Clap</option>
                             <option value="hihat">Hi-Hat Pattern</option>
@@ -342,46 +343,6 @@
                     <label class="flex items-center gap-2 text-xs text-slate-400" for="select-launchpad-4">
                         Launchpad button
                         <select id="select-launchpad-4" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300">
-                            <option value="">Not mapped</option>
-                        </select>
-                    </label>
-                </div>
-            </div>
-
-            <!-- PAD 6 -->
-            <div class="pad-card flex flex-col justify-between gap-4" id="card-pad-5" data-color="fuchsia">
-                <div class="flex justify-between items-start gap-2">
-                    <div>
-                        <span class="text-[10px] font-orbitron tracking-widest uppercase text-fuchsia-400 font-bold">PAD 6</span>
-                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
-                            <i class="fa-solid fa-compact-disc text-fuchsia-400"></i> <span id="pad-name-5">SYNTH_7</span>
-                        </h2>
-                    </div>
-                    <span id="badge-status-5" class="pad-status">OFF</span>
-                </div>
-
-                <button id="btn-pad-5" class="pad-button" data-state="off">
-                    <i class="fa-solid fa-play text-2xl" id="icon-pad-5"></i>
-                    <span class="text-xs font-semibold tracking-wide" id="label-pad-5">TAP TO LOOP</span>
-                </button>
-
-                <div class="flex flex-col gap-2 z-10">
-                    <div class="flex gap-2">
-                        <select id="select-sound-5" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-fuchsia-400">
-                            <option value="sample" selected>SYNTH_7.wav</option>
-                            <option value="kick">Synth Kick</option>
-                            <option value="snare">Beat Snare / Clap</option>
-                            <option value="hihat">Hi-Hat Pattern</option>
-                            <option value="synth">Synth Bass Loop</option>
-                        </select>
-                        <label class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-300 cursor-pointer transition-colors flex items-center justify-center gap-1 min-w-max">
-                            <i class="fa-solid fa-upload"></i> Custom
-                            <input type="file" id="file-pad-5" accept="audio/*" class="hidden">
-                        </label>
-                    </div>
-                    <label class="flex items-center gap-2 text-xs text-slate-400" for="select-launchpad-5">
-                        Launchpad button
-                        <select id="select-launchpad-5" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300">
                             <option value="">Not mapped</option>
                         </select>
                     </label>
@@ -407,14 +368,13 @@
 
         // Pad Definitions
         const pads = [
-            { id: 0, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_2/BASE_1.wav', player: null, colorClass: 'cyan' },
-            { id: 1, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_2/SYNTH_2.wav', player: null, colorClass: 'fuchsia' },
-            { id: 2, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_2/SYNTH_6.wav', player: null, colorClass: 'yellow' },
-            { id: 3, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_2/SYNTH_5.wav', player: null, colorClass: 'emerald' },
-            { id: 4, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_2/SYNTH_4.wav', player: null, colorClass: 'cyan' },
-            { id: 5, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_2/SYNTH_7.wav', player: null, colorClass: 'fuchsia' }
+            { id: 0, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_3/SYNTH_1_NAHELE.wav', player: null, colorClass: 'cyan' },
+            { id: 1, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_3/SYNTH_2_(81)_RICCARDO.wav', player: null, colorClass: 'fuchsia' },
+            { id: 2, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_3/SYNTH_3_(85)_RICCARDO.wav', player: null, colorClass: 'yellow' },
+            { id: 3, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_3/KICK_1_RICCARDO.wav', player: null, colorClass: 'emerald' },
+            { id: 4, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_3/KICK_2_RICCARDO.wav', player: null, colorClass: 'cyan' }
         ];
-        const LAUNCHPAD_MAPPING_STORAGE_KEY = 'looper-launchpad-mappings-v1';
+        const LAUNCHPAD_MAPPING_STORAGE_KEY = 'looper-launchpad-mappings-v2';
         const launchpadButtonIds = [
             ...Array.from({ length: 8 }, (_, row) =>
                 Array.from({ length: 8 }, (_, column) => (8 - row) * 10 + column + 1)
@@ -429,7 +389,7 @@
         let midiAccess = null;
         let midiInput = null;
         let midiConnectionEnabled = false;
-        const DEFAULT_LAUNCHPAD_MAPPINGS = [11, 12, 13, 14, 15, 16];
+        const DEFAULT_LAUNCHPAD_MAPPINGS = [11, 12, 13, 14, 15];
         let launchpadMappings = [...DEFAULT_LAUNCHPAD_MAPPINGS];
 
         function loadLaunchpadMappings() {
@@ -989,6 +949,25 @@
                         });
                     }
                 });
+            });
+        });
+    </script>
+    <script>
+        const ablyClient = new Ably.Realtime({
+            key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
+            clientId: `looper-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        });
+        const receiverAudioChannel = ablyClient.channels.get('receiver-audio');
+
+        receiverAudioChannel.subscribe('loading-complete', message => {
+            const receiverId = message.data?.receiverId;
+            if (typeof receiverId !== 'string') return;
+
+            receiverAudioChannel.publish('play-sfx', {
+                receiverId,
+                sound: 'loaded'
+            }).catch(error => {
+                console.error('Failed to send loading completion sound to receiver:', error);
             });
         });
     </script>
