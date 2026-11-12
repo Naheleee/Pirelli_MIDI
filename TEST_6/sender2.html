@@ -354,7 +354,10 @@
         ){
           return;
         }
-        midiChannel.publish('midi', { type: 'noteon', note: midi });
+        midiChannel.publish('midi', { type: 'noteon', note: midi })
+          .catch(error => {
+            console.error('Failed to send keyboard MIDI note-on:', error);
+          });
         if (!lettersReady || !whitePitchClasses.has(midi % 12)) return;
         selectedGroup = getGroupIndex(midi);
         showSelectedGroup();
@@ -366,7 +369,10 @@
           midi < firstMidiNote ||
           midi > lastMidiNote
         ) return;
-        midiChannel.publish('midi', { type: 'noteoff', note: midi });
+        midiChannel.publish('midi', { type: 'noteoff', note: midi })
+          .catch(error => {
+            console.error('Failed to send keyboard MIDI note-off:', error);
+          });
       }
 
       const keyboardNotes = new Map([

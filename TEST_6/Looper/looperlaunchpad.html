@@ -132,10 +132,10 @@
                 </div>
             </div>
 
-            <p class="text-xs text-slate-500 sm:text-right">Connect the Launchpad here to enable hardware input. Sounds start on the next loop boundary; open sender1 for physical light animations, or select a key under PAD 1 and open sender2 to trigger it. Click Start once to unlock audio for keyboard triggers.</p>
+            <p class="text-xs text-slate-500 sm:text-right">Click Start or connect a Launchpad here to unlock audio. sender2 MIDI 36 starts PAD 1 immediately; MIDI 65 deactivates it after its current loop finishes. sender1 Launchpad controls PAD 2–5 on the next loop boundary.</p>
             <p id="midi-status" class="text-xs text-slate-500 sm:col-span-2" role="status" aria-live="polite">Launchpad not connected.</p>
             <p id="looper-link-status" class="text-xs text-slate-500 sm:col-span-2" role="status">Waiting for sender1…</p>
-            <p id="keyboard-link-status" class="text-xs text-slate-500 sm:col-span-2" role="status" aria-live="polite">Waiting for sender2 keyboard input. Select a key under PAD 1.</p>
+            <p id="keyboard-link-status" class="text-xs text-slate-500 sm:col-span-2" role="status" aria-live="polite">Waiting for sender2 keyboard input. MIDI 36 starts PAD 1; MIDI 65 deactivates it after its current loop finishes.</p>
             <p id="audio-error" class="hidden text-sm text-red-400 sm:col-span-2" role="status"></p>
         </div>
 
@@ -181,13 +181,6 @@
                             <option value="">Not mapped</option>
                         </select>
                     </label>
-                    <label class="flex items-center gap-2 text-xs text-slate-400" for="select-keyboard-0">
-                        Keyboard key
-                        <select id="select-keyboard-0" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300">
-                            <option value="">Not mapped</option>
-                        </select>
-                    </label>
-                    <p class="text-[11px] text-slate-500">Stop PAD 1: MIDI 65</p>
                 </div>
             </div>
 
@@ -363,6 +356,7 @@
     <!-- TONE.JS LOOPER SCRIPT -->
     <script>
         let isEngineRunning = false;
+        let isTransportRunning = false;
         let bpm = 140;
         let maxBeats = 24;
         let engineStartPromise = null;
@@ -383,20 +377,6 @@
             { id: 4, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_3/KICK_2_RICCARDO.wav', player: null, colorClass: 'cyan' }
         ];
         const LAUNCHPAD_MAPPING_STORAGE_KEY = 'looper-launchpad-mappings-v2';
-        const KEYBOARD_MAPPING_STORAGE_KEY = 'looper-keyboard-mapping-v1';
-        const DEFAULT_KEYBOARD_NOTE_MAPPING = 36;
-        const KEYBOARD_STOP_NOTE = 65;
-        const KEYBOARD_NOTE_OPTIONS = [
-            { key: 'A', note: 36 },
-            { key: 'S', note: 40 },
-            { key: 'D', note: 43 },
-            { key: 'F', note: 47 },
-            { key: 'G', note: 50 },
-            { key: 'H', note: 53 },
-            { key: 'J', note: 57 },
-            { key: 'K', note: 60 },
-            { key: 'L', note: 64 }
-        ];
         const launchpadButtonIds = [
             ...Array.from({ length: 8 }, (_, row) =>
                 Array.from({ length: 8 }, (_, column) => (8 - row) * 10 + column + 1)
@@ -411,15 +391,17 @@
         let midiAccess = null;
         let midiInput = null;
         let midiConnectionEnabled = false;
-        const DEFAULT_LAUNCHPAD_MAPPINGS = [11, 12, 13, 14, 15];
+        const DEFAULT_LAUNCHPAD_MAPPINGS = [null, 12, 13, 14, 15];
         let launchpadMappings = [...DEFAULT_LAUNCHPAD_MAPPINGS];
-        let keyboardNoteMapping = DEFAULT_KEYBOARD_NOTE_MAPPING;
+        let keyboardPadStartRequest = 0;
+        let padOneStopAtLoopEnd = false;
 
         function loadLaunchpadMappings() {
             try {
                 const saved = JSON.parse(localStorage.getItem(LAUNCHPAD_MAPPING_STORAGE_KEY));
                 if (!Array.isArray(saved)) return [...DEFAULT_LAUNCHPAD_MAPPINGS];
                 return pads.map(pad => {
+                    if (pad.id === 0) return null;
                     if (pad.id >= saved.length) return DEFAULT_LAUNCHPAD_MAPPINGS[pad.id];
                     return launchpadButtonIds.includes(saved[pad.id]) ? saved[pad.id] : null;
                 });
@@ -453,9 +435,29 @@
             if (launchpadPressedInputs.has(inputKey)) return;
             launchpadPressedInputs.add(inputKey);
 
-            const matchedPads = pads.filter(pad => launchpadMappings[pad.id] === id);
+            const matchedPads = pads.filter(
+                pad => pad.id > 0 && launchpadMappings[pad.id] === id
+            );
             for (const pad of matchedPads) {
                 await togglePadState(pad.id);
+            }
+        }
+
+        function handleKeyboardMessage(message) {
+            const data = message.data;
+            if (data?.type !== 'noteon' || !Number.isInteger(data.note)) return;
+
+            const status = document.getElementById('keyboard-link-status');
+            status.textContent = 'Receiving sender2 keyboard input.';
+            if (data.note === 36) {
+                void startPadImmediately(0).catch(error => {
+                    const errorStatus = document.getElementById('audio-error');
+                    errorStatus.innerText = `Could not start PAD 1: ${error.message}`;
+                    errorStatus.classList.remove('hidden');
+                    console.error('Could not start PAD 1 from keyboard input:', error);
+                });
+            } else if (data.note === 65) {
+                stopPadAtLoopEnd(0);
             }
         }
 
@@ -490,21 +492,6 @@
                 return;
             }
             void handleLaunchpadInput(looperMidiSenderId, id, isDown);
-        }
-
-        function handleKeyboardMessage(message) {
-            const data = message.data;
-            if (!data || data.type !== 'noteon' || !Number.isInteger(data.note)) return;
-
-            document.getElementById('keyboard-link-status').textContent =
-                'Receiving keyboard input from sender2.';
-            if (data.note === KEYBOARD_STOP_NOTE) {
-                stopPad(0);
-            } else if (keyboardNoteMapping !== null && data.note === keyboardNoteMapping) {
-                void startPad(0).catch(error => {
-                    console.error('Could not start PAD 1 from keyboard input:', error);
-                });
-            }
         }
 
         function updateMidiPorts() {
@@ -618,7 +605,7 @@
 
         // Setup Beat Loop with Tone.Transport
         function updateTransportLoop() {
-            const restartTransport = isEngineRunning;
+            const restartTransport = isTransportRunning;
             if (restartTransport) {
                 Tone.Transport.stop();
                 Tone.Transport.position = '0:0:0';
@@ -662,6 +649,10 @@
                         }
                         Tone.Draw.schedule(() => updatePadUI(pad.id), time);
                     }
+                    if (pad.id === 0 && padOneStopAtLoopEnd) {
+                        padOneStopAtLoopEnd = false;
+                        if (pad.player) pad.player.stop(time + 0.01);
+                    }
                 });
                 if (padStateChanged) publishLooperState();
             }, `${loopDuration}s`, `${Math.max(0.001, loopDuration - 0.01)}s`);
@@ -685,7 +676,36 @@
                     }
                 });
                 Tone.Transport.start();
+                isTransportRunning = true;
             }
+        }
+
+        function startTransportAtPadOne(startTime) {
+            if (isTransportRunning) Tone.Transport.stop();
+            Tone.Transport.position = '0:0:0';
+            currentBeat = 0;
+
+            pads.forEach(pad => {
+                if (pad.id === 0) return;
+                if (pad.state === 'PENDING_START') {
+                    pad.state = 'PLAYING';
+                    if (pad.player && pad.player.loaded) {
+                        pad.player.stop();
+                        pad.player.start(startTime);
+                    }
+                    updatePadUI(pad.id);
+                } else if (
+                    pad.state === 'PLAYING' &&
+                    pad.player &&
+                    pad.player.loaded
+                ) {
+                    pad.player.stop();
+                    pad.player.start(startTime);
+                }
+            });
+
+            Tone.Transport.start(startTime);
+            isTransportRunning = true;
         }
 
         // Synth Sound Sequences
@@ -750,11 +770,10 @@
                     errorStatus.classList.add('hidden');
                     errorStatus.innerText = '';
                     updateTransportLoop();
-                    Tone.Transport.start();
                     isEngineRunning = true;
 
                     const masterBtn = document.getElementById('btn-master-start');
-                    masterBtn.innerHTML = `<i class="fa-solid fa-stop mr-1"></i> Stop engine`;
+                    masterBtn.innerHTML = `<i class="fa-solid fa-check mr-1"></i> Audio ready`;
                     return true;
                 } catch (error) {
                     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -772,7 +791,10 @@
 
         function stopEngine() {
             if (isEngineRunning) {
-                Tone.Transport.stop();
+                if (isTransportRunning) {
+                    Tone.Transport.stop();
+                    isTransportRunning = false;
+                }
                 isEngineRunning = false;
 
                 pads.forEach(p => {
@@ -780,6 +802,7 @@
                     if (p.player) p.player.stop();
                     updatePadUI(p.id);
                 });
+                padOneStopAtLoopEnd = false;
 
                 const masterBtn = document.getElementById('btn-master-start');
                 masterBtn.innerHTML = `<i class="fa-solid fa-play mr-1"></i> Start`;
@@ -803,28 +826,44 @@
             updatePadUI(padId);
         }
 
-        async function startPad(padId) {
-            if (!await startEngine()) return;
+        async function startPadImmediately(padId) {
             const pad = pads[padId];
-            if (pad.state === 'OFF') {
-                pad.state = 'PENDING_START';
-            } else if (pad.state === 'PENDING_STOP') {
-                pad.state = 'PLAYING';
+            if (pad.state === 'PLAYING') return;
+
+            const request = ++keyboardPadStartRequest;
+            if (!await startEngine() || request !== keyboardPadStartRequest) return;
+            if (
+                pad.state !== 'OFF' &&
+                pad.state !== 'PENDING_START' &&
+                pad.state !== 'PENDING_STOP'
+            ) return;
+
+            const startTime = Tone.now() + 0.02;
+            padOneStopAtLoopEnd = false;
+            startTransportAtPadOne(startTime);
+            if (pad.player && pad.player.loaded) {
+                pad.player.stop();
+                pad.player.start(startTime);
             } else {
-                return;
+                playPadSynthSound(pad.soundType, currentBeat, startTime);
             }
+            pad.state = 'PLAYING';
             updatePadUI(padId);
         }
 
-        function stopPad(padId) {
+        function stopPadAtLoopEnd(padId) {
+            keyboardPadStartRequest++;
             const pad = pads[padId];
+            if (pad.state === 'OFF') return;
+
             if (pad.state === 'PENDING_START') {
                 pad.state = 'OFF';
-            } else if (pad.state === 'PLAYING') {
-                pad.state = 'PENDING_STOP';
-            } else {
+                updatePadUI(padId);
                 return;
             }
+
+            padOneStopAtLoopEnd = true;
+            pad.state = 'OFF';
             updatePadUI(padId);
         }
 
@@ -879,47 +918,6 @@
         window.addEventListener('DOMContentLoaded', () => {
             document.getElementById('btn-connect-launchpad').addEventListener('click', connectLaunchpad);
             launchpadMappings = loadLaunchpadMappings();
-            const keyboardMappingSelect = document.getElementById('select-keyboard-0');
-            KEYBOARD_NOTE_OPTIONS.forEach(({ key, note }) => {
-                keyboardMappingSelect.add(new Option(`${key} (MIDI ${note})`, String(note)));
-            });
-            try {
-                const savedKeyboardNote = localStorage.getItem(KEYBOARD_MAPPING_STORAGE_KEY);
-                if (savedKeyboardNote === 'none') {
-                    keyboardNoteMapping = null;
-                } else if (savedKeyboardNote !== null) {
-                    const parsedNote = Number(savedKeyboardNote);
-                    keyboardNoteMapping = KEYBOARD_NOTE_OPTIONS.some(
-                        option => option.note === parsedNote
-                    ) ? parsedNote : DEFAULT_KEYBOARD_NOTE_MAPPING;
-                }
-            } catch (error) {
-                console.error('Could not load keyboard key mapping:', error);
-                document.getElementById('keyboard-link-status').textContent =
-                    `Could not load keyboard key mapping: ${error.message}`;
-            }
-            keyboardMappingSelect.value = keyboardNoteMapping === null
-                ? ''
-                : String(keyboardNoteMapping);
-            keyboardMappingSelect.addEventListener('change', event => {
-                keyboardNoteMapping = event.target.value === ''
-                    ? null
-                    : Number(event.target.value);
-                try {
-                    if (keyboardNoteMapping === null) {
-                        localStorage.setItem(KEYBOARD_MAPPING_STORAGE_KEY, 'none');
-                    } else {
-                        localStorage.setItem(
-                            KEYBOARD_MAPPING_STORAGE_KEY,
-                            String(keyboardNoteMapping)
-                        );
-                    }
-                } catch (error) {
-                    console.error('Could not save keyboard key mapping:', error);
-                    document.getElementById('keyboard-link-status').textContent =
-                        `Could not save keyboard key mapping: ${error.message}`;
-                }
-            });
             if (!looperChannel) {
                 document.getElementById('looper-link-status').textContent =
                     'Cross-page control requires BroadcastChannel support in this browser.';
@@ -929,6 +927,7 @@
                 launchpadButtonIds.forEach(id => {
                     mappingSelect.add(new Option(`Button ${id}`, String(id)));
                 });
+                mappingSelect.disabled = pad.id === 0;
                 mappingSelect.value = launchpadMappings[pad.id] === null
                     ? ''
                     : String(launchpadMappings[pad.id]);
@@ -974,13 +973,14 @@
 
             document.getElementById('btn-master-start').addEventListener('click', () => {
                 if (!isEngineRunning) {
-                    startEngine();
+                    void startEngine();
                 } else {
                     stopEngine();
                 }
             });
 
             document.getElementById('btn-stop-all').addEventListener('click', () => {
+                padOneStopAtLoopEnd = false;
                 pads.forEach(p => {
                     p.state = 'OFF';
                     if (p.player) p.player.stop();
@@ -1063,8 +1063,8 @@
         });
         const receiverAudioChannel = ablyClient.channels.get('receiver-audio');
         const keyboardChannel = ablyClient.channels.get('keyboard');
-        keyboardChannel.subscribe('midi', handleKeyboardMessage);
 
+        keyboardChannel.subscribe('midi', handleKeyboardMessage);
         receiverAudioChannel.subscribe('loading-complete', message => {
             const receiverId = message.data?.receiverId;
             if (typeof receiverId !== 'string') return;
