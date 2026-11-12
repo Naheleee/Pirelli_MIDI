@@ -1,4 +1,6 @@
-const realtimeClient = createRealtimeClient(`vista2-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+const localRealtime = new LocalRealtime({
+    clientId: `vista2-${Date.now()}-${Math.random().toString(36).slice(2)}`
+});
 
 const glyphInfoFields = new Map(
     Array.from(document.querySelectorAll('[data-glyph-info]'), field => [
@@ -55,7 +57,7 @@ if (!handTrackingContext) {
     throw new Error('Unable to create a canvas for hand tracking.');
 }
 
-realtimeClient.channel('handtracking-vista2').subscribe('fingertips', message => {
+localRealtime.channels.get('handtracking-vista2').subscribe('fingertips', message => {
     const hands = message.data?.hands;
     if (!Array.isArray(hands)) return;
 
@@ -105,7 +107,7 @@ realtimeClient.channel('handtracking-vista2').subscribe('fingertips', message =>
     handTrackingContext.restore();
 });
 
-realtimeClient.channel('letter-cycle').subscribe('letter', message => {
+localRealtime.channels.get('letter-cycle').subscribe('letter', message => {
     const { glyph, beat } = message.data ?? {};
     if (typeof glyph === 'string' && Array.from(glyph).length === 1) {
         updateGlyphInfo(glyph);
@@ -164,7 +166,7 @@ realtimeClient.channel('letter-cycle').subscribe('letter', message => {
         return !sequencedSenders.has(data.senderId);
     }
 
-    realtimeClient.channel('launchpad').subscribe('midi', message => {
+    localRealtime.channels.get('launchpad').subscribe('midi', message => {
         const data = message.data;
         if (
             !data ||
@@ -179,7 +181,7 @@ realtimeClient.channel('letter-cycle').subscribe('letter', message => {
         );
     });
 
-    realtimeClient.channel('launchpad').subscribe('led', message => {
+    localRealtime.channels.get('launchpad').subscribe('led', message => {
         const data = message.data;
         if (!data) return;
         if (
@@ -191,7 +193,7 @@ realtimeClient.channel('letter-cycle').subscribe('letter', message => {
         pads.get(data.id).classList.toggle('lit', data.velocity > 0);
     });
 
-    realtimeClient.channel('launchpad').subscribe('led', message => {
+    localRealtime.channels.get('launchpad').subscribe('led', message => {
         const data = message.data;
         if (
             !data ||

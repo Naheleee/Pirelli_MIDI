@@ -6,8 +6,7 @@
   <title>PirelliVar Studio - Variable Font Wave</title>
   <script src="https://cdn.jsdelivr.net/npm/webmidi@3.1.16/dist/iife/webmidi.iife.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-  <script src="/socket.io/socket.io.js"></script>
-  <script src="Javascript/realtime.js"></script>
+  <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
   <style>
     @font-face {
       font-family: PirelliVar;
@@ -63,8 +62,8 @@
   <script>
     const square = document.getElementById('square');
     const wrapper = document.getElementById('wrapper');
-    const realtimeClient = createRealtimeClient(`keyboard-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    const midiChannel = realtimeClient.channel('keyboard');
+    const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
+    const midiChannel = ablyClient.channels.get('keyboard');
     // Adjust letter spacing and transition behavior here.
     const CONFIG = {
       letterCount: 9,
@@ -226,8 +225,6 @@
           midiChannel.publish('midi', {
             type: 'fontchange',
             fontFamily
-          }).catch(error => {
-            console.error('Failed to publish keyboard font change:', error);
           });
         })
         .catch(error => {

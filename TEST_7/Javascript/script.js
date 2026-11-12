@@ -1,11 +1,13 @@
 const receiverClientId = `receiver-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const realtimeClient = createRealtimeClient(receiverClientId);
-const letterCycleChannel = realtimeClient.channel('letter-cycle');
+const localRealtime = new LocalRealtime({
+    clientId: receiverClientId
+});
+const letterCycleChannel = localRealtime.channels.get('letter-cycle');
 const letterCyclePresence = letterCycleChannel.presence;
-const handTrackingChannel = realtimeClient.channel('handtracking-vista2');
-const keyboardChannel = realtimeClient.channel('keyboard');
-const launchpadChannel = realtimeClient.channel('launchpad');
-const receiverAudioChannel = realtimeClient.channel('receiver-audio');
+const handTrackingChannel = localRealtime.channels.get('handtracking-vista2');
+const keyboardChannel = localRealtime.channels.get('keyboard');
+const launchpadChannel = localRealtime.channels.get('launchpad');
+const receiverAudioChannel = localRealtime.channels.get('receiver-audio');
 let lastHandTrackingPublish = 0;
 let letterCycleLeaderId = null;
 let letterCycleElection = 0;
@@ -318,7 +320,7 @@ messageTrack.addEventListener('transitionend', event => {
 });
 
 function watchMidiDeviceStatus(channelName, statusElement) {
-    const presence = realtimeClient.channel(channelName).presence;
+    const presence = localRealtime.channels.get(channelName).presence;
     const members = new Set();
     const queuedEvents = [];
     let snapshotLoaded = false;
@@ -1176,7 +1178,7 @@ function advanceLooper() {
 letterCycleChannel.subscribe('letter', message => {
     if (
         message.connectionId !== letterCycleLeaderId ||
-        message.connectionId === realtimeClient.id
+        message.connectionId === localRealtime.connection.id
     ) return;
 
     const { glyph, beat, width, widthFrom, widthStartedAt, widthDuration } = message.data ?? {};
@@ -1217,7 +1219,7 @@ async function electLetterCycleLeader() {
         )).sort();
         letterCycleLeaderId = receiverIds[0] ?? null;
 
-        if (letterCycleLeaderId === realtimeClient.id) {
+        if (letterCycleLeaderId === localRealtime.connection.id) {
             if (letterCycleInterval === null && looperSquares.length > 0) {
                 advanceLooper();
                 letterCycleInterval = window.setInterval(advanceLooper, 60000 / 70);

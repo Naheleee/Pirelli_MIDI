@@ -21,8 +21,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Tone.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="../Javascript/realtime.js"></script>
+    <script src="../Javascript/local-realtime.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -1120,24 +1119,14 @@
         });
     </script>
     <script>
-        const realtimeClient = createRealtimeClient(`looper-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-        const receiverAudioChannel = realtimeClient.channel('receiver-audio');
-        const keyboardChannel = realtimeClient.channel('keyboard');
-        looperSyncChannel = realtimeClient.channel('looper-pad-sync');
-
-        realtimeClient.socket.on('connect', () => {
-            document.getElementById('looper-sync-status').textContent =
-                'Connected to other looper pages.';
+        const localRealtime = new LocalRealtime({
+            clientId: `looper-${Date.now()}-${Math.random().toString(36).slice(2)}`
         });
-        realtimeClient.socket.on('disconnect', () => {
-            document.getElementById('looper-sync-status').textContent =
-                'Cross-computer sync unavailable: disconnected.';
-        });
-        realtimeClient.socket.on('connect_error', error => {
-            const reason = error.message || 'Connection failed.';
-            document.getElementById('looper-sync-status').textContent =
-                `Cross-computer sync unavailable: ${reason}`;
-        });
+        const receiverAudioChannel = localRealtime.channels.get('receiver-audio');
+        const keyboardChannel = localRealtime.channels.get('keyboard');
+        looperSyncChannel = localRealtime.channels.get('looper-pad-sync');
+        document.getElementById('looper-sync-status').textContent =
+            'Local communication active.';
         looperSyncChannel.subscribe('pad-action', message => {
             void handleRemotePadAction(message.data).catch(error => {
                 document.getElementById('looper-sync-status').textContent =

@@ -1,6 +1,6 @@
 const letter = document.querySelector('.lettera');
-const realtimeClient = createRealtimeClient(`vista1-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-const letterCycleChannel = realtimeClient.channel('letter-cycle');
+const localRealtime = new LocalRealtime(`vista1-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+const letterCycleChannel = localRealtime.channels.get('letter-cycle');
 const letterCyclePresence = letterCycleChannel.presence;
 let letterCycleLeaderId = null;
 let electionRequest = 0;
