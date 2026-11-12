@@ -1,7 +1,4 @@
-const ablyClient = new Ably.Realtime({
-    key: 'xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0',
-    clientId: `vista2-${Date.now()}-${Math.random().toString(36).slice(2)}`
-});
+const realtimeClient = createRealtimeClient(`vista2-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
 const glyphInfoFields = new Map(
     Array.from(document.querySelectorAll('[data-glyph-info]'), field => [
@@ -58,7 +55,7 @@ if (!handTrackingContext) {
     throw new Error('Unable to create a canvas for hand tracking.');
 }
 
-ablyClient.channels.get('handtracking-vista2').subscribe('fingertips', message => {
+realtimeClient.channel('handtracking-vista2').subscribe('fingertips', message => {
     const hands = message.data?.hands;
     if (!Array.isArray(hands)) return;
 
@@ -108,7 +105,7 @@ ablyClient.channels.get('handtracking-vista2').subscribe('fingertips', message =
     handTrackingContext.restore();
 });
 
-ablyClient.channels.get('letter-cycle').subscribe('letter', message => {
+realtimeClient.channel('letter-cycle').subscribe('letter', message => {
     const { glyph, beat } = message.data ?? {};
     if (typeof glyph === 'string' && Array.from(glyph).length === 1) {
         updateGlyphInfo(glyph);
@@ -167,7 +164,7 @@ ablyClient.channels.get('letter-cycle').subscribe('letter', message => {
         return !sequencedSenders.has(data.senderId);
     }
 
-    ablyClient.channels.get('launchpad').subscribe('midi', message => {
+    realtimeClient.channel('launchpad').subscribe('midi', message => {
         const data = message.data;
         if (
             !data ||
@@ -182,7 +179,7 @@ ablyClient.channels.get('letter-cycle').subscribe('letter', message => {
         );
     });
 
-    ablyClient.channels.get('launchpad').subscribe('led', message => {
+    realtimeClient.channel('launchpad').subscribe('led', message => {
         const data = message.data;
         if (!data) return;
         if (
@@ -194,7 +191,7 @@ ablyClient.channels.get('letter-cycle').subscribe('letter', message => {
         pads.get(data.id).classList.toggle('lit', data.velocity > 0);
     });
 
-    ablyClient.channels.get('launchpad').subscribe('led', message => {
+    realtimeClient.channel('launchpad').subscribe('led', message => {
         const data = message.data;
         if (
             !data ||

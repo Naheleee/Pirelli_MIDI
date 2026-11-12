@@ -571,17 +571,15 @@
         </div>
     </aside>
 
-    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="Javascript/realtime.js"></script>
     <script>
         const ledPublisherId = `sender1-${Date.now()}-${Math.random().toString(36).slice(2)}`;
         const looperChannel = typeof BroadcastChannel === 'function'
             ? new BroadcastChannel('launchpad-looper')
             : null;
-        const ablyClient = new Ably.Realtime({
-            key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
-            clientId: ledPublisherId
-        });
-        const midiChannel = ablyClient.channels.get("launchpad");
+        const realtimeClient = createRealtimeClient(ledPublisherId);
+        const midiChannel = realtimeClient.channel("launchpad");
         let ledMessageSequence = 0;
         const ORANGE_LED = 9;
         const WHITE_LED = 3;
@@ -891,6 +889,8 @@
                 animationControlsLight: padAnimations.has(id),
                 senderId: ledPublisherId,
                 sequence: ++ledMessageSequence
+            }).catch(error => {
+                console.error('Failed to publish Launchpad button press:', error);
             });
         }
 
@@ -907,6 +907,8 @@
                 animationControlsLight: padAnimations.has(id),
                 senderId: ledPublisherId,
                 sequence: ++ledMessageSequence
+            }).catch(error => {
+                console.error('Failed to publish Launchpad button release:', error);
             });
         }
 

@@ -1,6 +1,6 @@
 const letter = document.querySelector('.lettera');
-const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
-const letterCycleChannel = ablyClient.channels.get('letter-cycle');
+const realtimeClient = createRealtimeClient(`vista1-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+const letterCycleChannel = realtimeClient.channel('letter-cycle');
 const letterCyclePresence = letterCycleChannel.presence;
 let letterCycleLeaderId = null;
 let electionRequest = 0;

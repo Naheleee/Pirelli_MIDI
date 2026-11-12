@@ -1,14 +1,11 @@
 const receiverClientId = `receiver-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const ablyClient = new Ably.Realtime({
-    key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
-    clientId: receiverClientId
-});
-const letterCycleChannel = ablyClient.channels.get('letter-cycle');
+const realtimeClient = createRealtimeClient(receiverClientId);
+const letterCycleChannel = realtimeClient.channel('letter-cycle');
 const letterCyclePresence = letterCycleChannel.presence;
-const handTrackingChannel = ablyClient.channels.get('handtracking-vista2');
-const keyboardChannel = ablyClient.channels.get('keyboard');
-const launchpadChannel = ablyClient.channels.get('launchpad');
-const receiverAudioChannel = ablyClient.channels.get('receiver-audio');
+const handTrackingChannel = realtimeClient.channel('handtracking-vista2');
+const keyboardChannel = realtimeClient.channel('keyboard');
+const launchpadChannel = realtimeClient.channel('launchpad');
+const receiverAudioChannel = realtimeClient.channel('receiver-audio');
 let lastHandTrackingPublish = 0;
 let letterCycleLeaderId = null;
 let letterCycleElection = 0;
@@ -321,7 +318,7 @@ messageTrack.addEventListener('transitionend', event => {
 });
 
 function watchMidiDeviceStatus(channelName, statusElement) {
-    const presence = ablyClient.channels.get(channelName).presence;
+    const presence = realtimeClient.channel(channelName).presence;
     const members = new Set();
     const queuedEvents = [];
     let snapshotLoaded = false;
@@ -1179,7 +1176,7 @@ function advanceLooper() {
 letterCycleChannel.subscribe('letter', message => {
     if (
         message.connectionId !== letterCycleLeaderId ||
-        message.connectionId === ablyClient.connection.id
+        message.connectionId === realtimeClient.id
     ) return;
 
     const { glyph, beat, width, widthFrom, widthStartedAt, widthDuration } = message.data ?? {};
@@ -1220,7 +1217,7 @@ async function electLetterCycleLeader() {
         )).sort();
         letterCycleLeaderId = receiverIds[0] ?? null;
 
-        if (letterCycleLeaderId === ablyClient.connection.id) {
+        if (letterCycleLeaderId === realtimeClient.id) {
             if (letterCycleInterval === null && looperSquares.length > 0) {
                 advanceLooper();
                 letterCycleInterval = window.setInterval(advanceLooper, 60000 / 70);

@@ -21,7 +21,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Tone.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
-    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="../Javascript/realtime.js"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -1119,20 +1120,21 @@
         });
     </script>
     <script>
-        const ablyClient = new Ably.Realtime({
-            key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
-            clientId: `looper-${Date.now()}-${Math.random().toString(36).slice(2)}`
-        });
-        const receiverAudioChannel = ablyClient.channels.get('receiver-audio');
-        const keyboardChannel = ablyClient.channels.get('keyboard');
-        looperSyncChannel = ablyClient.channels.get('looper-pad-sync');
+        const realtimeClient = createRealtimeClient(`looper-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        const receiverAudioChannel = realtimeClient.channel('receiver-audio');
+        const keyboardChannel = realtimeClient.channel('keyboard');
+        looperSyncChannel = realtimeClient.channel('looper-pad-sync');
 
-        ablyClient.connection.on('connected', () => {
+        realtimeClient.socket.on('connect', () => {
             document.getElementById('looper-sync-status').textContent =
                 'Connected to other looper pages.';
         });
-        ablyClient.connection.on('failed', stateChange => {
-            const reason = stateChange.reason?.message || 'Connection failed.';
+        realtimeClient.socket.on('disconnect', () => {
+            document.getElementById('looper-sync-status').textContent =
+                'Cross-computer sync unavailable: disconnected.';
+        });
+        realtimeClient.socket.on('connect_error', error => {
+            const reason = error.message || 'Connection failed.';
             document.getElementById('looper-sync-status').textContent =
                 `Cross-computer sync unavailable: ${reason}`;
         });
