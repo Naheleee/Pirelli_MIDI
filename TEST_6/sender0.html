@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Launchpad Matrix</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            font-family: Arial, sans-serif;
+            background: #1a1a1a;
+            color: #aaa;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            margin: 0;
+            display: grid;
+            place-items: center;
+            background: #1a1a1a;
+        }
+
+        main {
+            width: min(94vmin, 720px);
+            aspect-ratio: 1;
+        }
+
+        #connect {
+            position: fixed;
+            left: 16px;
+            bottom: 16px;
+            z-index: 2;
+            min-width: 42px;
+            min-height: 42px;
+            padding: 8px;
+            border: 1px solid #f46404;
+            border-radius: 0;
+            background: #1a1a1a;
+            color: #f46404;
+            cursor: pointer;
+        }
+
+        #connect:hover {
+            background: #2a2a2a;
+        }
+
+        #pressed-buttons {
+            position: fixed;
+            left: 16px;
+            bottom: 76px;
+            z-index: 2;
+            min-width: 154px;
+            max-width: min(250px, calc(100vw - 32px));
+            padding: 8px 10px;
+            border: 1px solid #f46404;
+            background: #1a1a1a;
+            color: #f46404;
+            font: 12px "Courier New", Courier, monospace;
+            pointer-events: none;
+        }
+
+        #pressed-buttons-value {
+            margin-top: 4px;
+            color: #aaa;
+            overflow-wrap: anywhere;
+        }
+
+        #matrix {
+            display: grid;
+            grid-template-columns: repeat(9, minmax(0, 1fr));
+            grid-template-rows: repeat(9, minmax(0, 1fr));
+            gap: 0;
+            width: calc(100% + 1px);
+            height: calc(100% + 1px);
+            border-top: 1px solid #f46404;
+            border-left: 1px solid #f46404;
+        }
+
+        .pad {
+            min-width: 0;
+            min-height: 0;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            border-right: 1px solid #f46404;
+            border-bottom: 1px solid #f46404;
+            border-radius: 0;
+            background: #1a1a1a;
+            color: #777;
+            cursor: pointer;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        .pad.spacer {
+            pointer-events: none;
+        }
+
+        .spacer {
+            border-right: 1px solid #f46404;
+            border-bottom: 1px solid #f46404;
+        }
+
+
+        .pad {
+            position: relative;
+        }
+
+        .pad.active {
+            background: #f46404;
+            opacity: 0.5;
+        }
+
+        .pad.active::after {
+            content: "";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: calc(100% + 1px);
+            height: calc(100% + 1px);
+            border-radius: 50%;
+            background: #f46404;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        #studio {
+            --studio-surface: #252525;
+            --studio-raised: #2d2d2d;
+            --studio-border: #454545;
+            --studio-muted: #aaa;
+            --studio-orange: #f46404;
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 3;
+            width: min(390px, calc(100vw - 32px));
+            max-height: calc(100vh - 32px);
+            overflow: auto;
+            border: 1px solid var(--studio-border);
+            border-top: 3px solid var(--studio-orange);
+            border-radius: 6px;
+            background: var(--studio-surface);
+            color: #ddd;
+            box-shadow: 0 12px 36px #0009;
+            scrollbar-color: #666 var(--studio-surface);
+        }
+
+        #studio,
+        #studio * {
+            font-family: Inter, "Segoe UI", Arial, sans-serif !important;
+            font-size: 13px !important;
+        }
+
+        #studio-header {
+            position: sticky;
+            top: 0;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--studio-border);
+            background: var(--studio-surface);
+            color: #f46404;
+        }
+
+        #studio-header-copy {
+            min-width: 0;
+        }
+
+        #studio-header h2 {
+            margin: 0;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+
+        #studio-header p {
+            margin: 5px 0 0;
+            color: var(--studio-muted);
+            letter-spacing: normal;
+        }
+
+        #studio button,
+        #studio input,
+        #studio select {
+            min-height: 38px;
+            border: 1px solid var(--studio-border);
+            border-radius: 4px;
+            background: var(--studio-raised);
+            color: #ddd;
+            font: inherit;
+        }
+
+        #studio button {
+            padding: 7px 10px;
+            cursor: pointer;
+            transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+        }
+
+        #studio button:hover,
+        #studio button:focus-visible {
+            border-color: var(--studio-orange);
+            background-color: #383838;
+        }
+
+        #studio button:active {
+            transform: translateY(1px);
+        }
+
+        #studio button:focus-visible,
+        #studio input:focus-visible,
+        #studio select:focus-visible {
+            outline: 2px solid #f46404;
+            outline-offset: 2px;
+        }
+
+        #studio .studio-content {
+            padding: 14px 16px 16px;
+        }
+
+        .studio-label {
+            display: block;
+            margin-bottom: 8px;
+            color: #f46404;
+            font-weight: 700;
+        }
+
+        .studio-hint {
+            margin: 5px 0 10px;
+            color: var(--studio-muted);
+            line-height: 1.45;
+        }
+
+        #studio-grid {
+            display: grid;
+            grid-template-columns: repeat(8, minmax(0, 1fr));
+            gap: 5px;
+            margin: 8px 0 10px;
+        }
+
+        #studio .studio-pad {
+            min-width: 0;
+            min-height: 36px;
+            padding: 0;
+            border-color: #555;
+            background: #202020;
+            color: #aaa;
+            touch-action: manipulation;
+        }
+
+        #studio .studio-pad.selected {
+            border-color: var(--studio-orange);
+            background: #383838;
+            color: #fff;
+            box-shadow: inset 0 0 0 1px var(--studio-orange);
+        }
+
+        #studio .studio-pad.playing {
+            background: #f46404;
+            color: #111;
+        }
+
+        .studio-section {
+            margin-top: 0;
+            padding-top: 4px;
+        }
+
+        .studio-divider {
+            width: calc(100% + 32px);
+            height: 0;
+            margin: 16px -16px;
+            border: 0;
+            border-top: 1px solid var(--studio-border);
+        }
+
+        .studio-section h3 {
+            margin: 0 0 6px;
+            color: #f46404;
+            font-weight: 700;
+        }
+
+        .studio-selection {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 9px 10px;
+            border: 1px solid var(--studio-border);
+            border-radius: 4px;
+            background: var(--studio-raised);
+        }
+
+        .studio-selection label {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .studio-selection input {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            accent-color: #f46404;
+        }
+
+        #studio-selection-count {
+            color: #f46404;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .studio-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .studio-row > input:not([type="checkbox"]):not([type="file"]),
+        .studio-row > select {
+            min-width: 0;
+            flex: 1;
+            padding: 4px;
+        }
+
+        .studio-row > button {
+            padding: 7px 12px;
+        }
+
+        #studio .studio-button-primary {
+            border-color: #f46404;
+            background: #f46404;
+            color: #111;
+            font-weight: 700;
+        }
+
+        #studio .studio-button-primary:hover,
+        #studio .studio-button-primary:focus-visible {
+            border-color: #f46404;
+            background: #f46404;
+        }
+
+        #studio-keyframes {
+            display: grid;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .animation-frame {
+            padding: 10px;
+            border: 1px solid var(--studio-border);
+            border-radius: 4px;
+            background: #202020;
+        }
+
+        .animation-frame-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            margin-bottom: 9px;
+            font-weight: 700;
+        }
+
+        .animation-frame-header span {
+            color: #f46404;
+        }
+
+        .animation-speed-control {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 8px 0;
+            color: var(--studio-muted);
+        }
+
+        .animation-speed-control label {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .animation-speed-control input {
+            width: 14px;
+            min-height: 14px !important;
+            margin: 0;
+            accent-color: #f46404;
+        }
+
+        .frame-matrix {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 2px;
+            width: 100%;
+        }
+
+        #studio .frame-pad {
+            min-width: 0;
+            min-height: 28px;
+            padding: 0;
+            border-color: #555;
+            border-radius: 2px !important;
+            color: #777;
+            background: #292929;
+            touch-action: none;
+            cursor: crosshair;
+        }
+
+        #studio .frame-pad.on {
+            background: #f46404;
+            color: #111;
+        }
+
+        #studio-status {
+            position: sticky;
+            bottom: 0;
+            min-height: 34px;
+            margin: 12px 0 0;
+            padding: 9px 10px;
+            border: 1px solid var(--studio-border);
+            border-left: 3px solid #f46404;
+            border-radius: 4px;
+            background: var(--studio-raised);
+            color: #f46404;
+        }
+
+        #studio-status:empty {
+            display: none;
+        }
+
+        #studio.minimized {
+            width: auto;
+            max-height: none;
+        }
+
+        #studio.minimized #studio-header {
+            border-bottom: 0;
+        }
+
+        #studio.minimized .studio-content {
+            display: none;
+        }
+
+        @media (min-width: 761px) {
+            body {
+                padding-right: 420px;
+            }
+
+            main {
+                width: min(94vmin, 720px, calc(100vw - 460px));
+            }
+        }
+
+        @media (max-width: 760px) {
+            #studio {
+                top: auto;
+                right: 8px;
+                bottom: 8px;
+                max-height: min(78vh, 680px);
+                width: min(390px, calc(100vw - 16px));
+            }
+
+            #connect {
+                right: auto;
+                left: 8px;
+                top: 8px;
+                bottom: auto;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <div id="matrix" aria-label="Launchpad pad matrix"></div>
+    </main>
+    <button id="connect" type="button" aria-label="Connect Launchpad" title="Connect Launchpad">Connect</button>
+    <aside id="pressed-buttons" aria-label="Launchpad button input">
+        <div>BUTTONS PRESSED</div>
+        <div id="pressed-buttons-value" role="status" aria-live="polite">None</div>
+    </aside>
+    <aside id="studio" aria-label="Launchpad Studio">
+        <div id="studio-header">
+            <div id="studio-header-copy">
+                <h2>LAUNCHPAD STUDIO</h2>
+                <p>Build and play light animations</p>
+            </div>
+            <button id="studio-minimize" type="button" aria-expanded="true" aria-label="Minimize studio" title="Minimize studio">−</button>
+        </div>
+        <div class="studio-content">
+            <span class="studio-label">Click a button to apply the current animation</span>
+            <div id="studio-grid" aria-label="Studio buttons"></div>
+            <div class="studio-selection">
+                <span id="studio-selection-count" aria-live="polite">No button selected</span>
+            </div>
+            <p class="studio-hint">Select a button to edit its animation. Existing animations load automatically; changes apply to that button right away. Map sounds to Launchpad buttons in the Looper page.</p>
+
+            <section class="studio-section">
+                <h3>1. Create a light animation</h3>
+                <p class="studio-hint">Choose a sample or draw each frame. Click or drag across squares to paint lights on or off.</p>
+                <div class="studio-row">
+                    <select id="studio-animation" aria-label="Choose an animation">
+                        <option value="custom">Custom frames</option>
+                        <option value="pulse">Sample: Pulse</option>
+                        <option value="fade">Sample: Fade</option>
+                        <option value="chase">Sample: Chase</option>
+                        <option value="spark">Sample: Spark</option>
+                        <option value="studio-preset:1">Studio preset: Momentary Glow</option>
+                        <option value="studio-preset:2">Studio preset: Radial Ripple</option>
+                        <option value="studio-preset:3">Studio preset: Crosshair Laser</option>
+                        <option value="studio-preset:4">Studio preset: Diamond Pulse</option>
+                        <option value="studio-preset:5">Studio preset: Sparkle Scatter</option>
+                        <option value="studio-preset:6">Studio preset: Raindrop Cascade</option>
+                        <option value="studio-preset:7">Studio preset: Spiral Vortex</option>
+                        <option value="studio-preset:8">Studio preset: Full Grid Flash</option>
+                    </select>
+                </div>
+                <p id="studio-animation-timing" class="studio-hint">1 frame per beat at 140 BPM (about 429 ms per frame).</p>
+                <div class="animation-speed-control" aria-label="Animation speed">
+                    <span>Speed</span>
+                    <label for="studio-animation-speed-2">
+                        <input id="studio-animation-speed-2" type="checkbox">
+                        ×2
+                    </label>
+                    <label for="studio-animation-speed-4">
+                        <input id="studio-animation-speed-4" type="checkbox">
+                        ×4
+                    </label>
+                </div>
+                <div id="studio-keyframes" aria-label="Animation frames"></div>
+                <div class="studio-row">
+                    <button id="studio-play-animation" type="button">▶ Preview</button>
+                </div>
+                <p class="studio-hint">Optional: save these frames by name to reuse them later.</p>
+                <div class="studio-row" style="margin-top: 6px">
+                    <input id="studio-animation-name" type="text" maxlength="60" placeholder="Animation name" aria-label="Animation name">
+                    <button id="studio-save-animation" class="studio-button-primary" type="button">Save animation</button>
+                </div>
+            </section>
+
+            <hr class="studio-divider">
+
+            <section class="studio-section">
+                <h3>2. Save animations</h3>
+                <p class="studio-hint">Save button animations and the current frame editor together.</p>
+                <div class="studio-row">
+                    <input id="studio-preset-name" type="text" maxlength="60" placeholder="Preset name" aria-label="Preset name">
+                    <button id="studio-save-preset" class="studio-button-primary" type="button">Save preset</button>
+                </div>
+                <div class="studio-row" style="margin-top: 6px">
+                    <select id="studio-presets" aria-label="Saved presets">
+                        <option value="">Saved presets</option>
+                    </select>
+                    <button id="studio-load-preset" type="button">Load</button>
+                    <button id="studio-delete-preset" type="button">Delete</button>
+                </div>
+            </section>
+            <p id="studio-status" role="status" aria-live="polite"></p>
+        </div>
+    </aside>
+
+    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+    <script>
+        const ledPublisherId = `sender1-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        const looperChannel = typeof BroadcastChannel === 'function'
+            ? new BroadcastChannel('launchpad-looper')
+            : null;
+        const ablyClient = new Ably.Realtime({
+            key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
+            clientId: ledPublisherId
+        });
+        const midiChannel = ablyClient.channels.get("launchpad");
+        let ledMessageSequence = 0;
+        const ORANGE_LED = 9;
+        const WHITE_LED = 3;
+        const rows = [{
+                base: 81,
+                scene: 89
+            },
+            {
+                base: 71,
+                scene: 79
+            },
+            {
+                base: 61,
+                scene: 69
+            },
+            {
+                base: 51,
+                scene: 59
+            },
+            {
+                base: 41,
+                scene: 49
+            },
+            {
+                base: 31,
+                scene: 39
+            },
+            {
+                base: 21,
+                scene: 29
+            },
+            {
+                base: 11,
+                scene: 19
+            }
+        ];
+        const pads = new Map();
+        const pressedPads = new Set();
+        const hardwarePressedPads = new Set();
+        let midiAccess = null;
+        let midiInput = null;
+        let midiOutput = null;
+        let initializedMidiOutput = null;
+        let launchpadPresenceActive = false;
+        const matrix = document.getElementById('matrix');
+        const status = document.getElementById('status');
+
+        function createPad(id) {
+            const pad = document.createElement('button');
+            pad.type = 'button';
+            pad.className = 'pad';
+            pad.setAttribute('aria-label', `Launchpad button ${id}`);
+            pad.title = `Button ${id}`;
+            pad.addEventListener('pointerdown', event => {
+                if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+                event.preventDefault();
+                pad.setPointerCapture(event.pointerId);
+                pressPad(id);
+            });
+            pad.addEventListener('pointerup', () => releasePad(id));
+            pad.addEventListener('pointercancel', () => releasePad(id));
+            pad.addEventListener('lostpointercapture', () => releasePad(id));
+            pads.set(id, pad);
+            matrix.appendChild(pad);
+        }
+
+        function createSpacer() {
+            const spacer = document.createElement('div');
+            spacer.className = 'spacer';
+            spacer.setAttribute('aria-hidden', 'true');
+            matrix.appendChild(spacer);
+        }
+
+        for (let id = 91; id <= 98; id++) createPad(id);
+        createSpacer();
+        for (const row of rows) {
+            for (let column = 0; column < 8; column++) createPad(row.base + column);
+            createPad(row.scene);
+        }
+
+        const sceneLedStates = new Map([[92, 0], [93, 0], [94, 0]]);
+        const loadingSnakePadIds = rows.flatMap(row =>
+            Array.from({ length: 8 }, (_, column) => row.base + column)
+        );
+        const launchpadGridPadIds = new Set(loadingSnakePadIds);
+        const remoteAnimationLitPads = new Set();
+        const pendingBlinkPads = new Set();
+        let pendingBlinkTimer = null;
+        let pendingBlinkOn = false;
+        let receivedRemoteAnimationFrame = false;
+        let loadingSnakeStepDuration = 120;
+        let loadingSnakeStartedAt = 0;
+        let loadingBlinkActive = false;
+        const loadingSnakeTrail = new Set();
+
+        function midiMessage(id, velocity) {
+            if (id >= 91 && id <= 98) return [0xb0, id + 13, velocity];
+            return [0x90, id, velocity];
+        }
+
+        function initializeLaunchpadOutput(output) {
+            try {
+                output.send([0xb0, 0, 0]);
+                output.send([0xb0, 0, 1]);
+                for (const id of pads.keys()) {
+                    output.send(midiMessage(id, 0));
+                }
+                initializedMidiOutput = output;
+            } catch (error) {
+                document.getElementById('connect').title = `MIDI output initialization failed: ${error.message}`;
+            }
+        }
+
+        function sendLed(id, velocity, timestamp, publishState = true) {
+            if (publishState) {
+                midiChannel.publish('led', {
+                    id,
+                    velocity,
+                    senderId: ledPublisherId,
+                    sequence: ++ledMessageSequence,
+                    delayMs: timestamp === undefined ? 0 : Math.max(0, timestamp - performance.now())
+                }).catch(error => {
+                    console.error('Failed to publish Launchpad LED state:', error);
+                });
+            }
+            if (midiOutput) {
+                try {
+                    if (timestamp === undefined) {
+                        midiOutput.send(midiMessage(id, velocity));
+                    } else {
+                        midiOutput.send(midiMessage(id, velocity), timestamp);
+                    }
+                } catch (error) {
+                    document.getElementById('connect').title = `MIDI output error: ${error.message}`;
+                }
+            }
+        }
+
+        function renderLoadingBlink(isActive) {
+            for (const id of pads.keys()) {
+                if (sceneLedStates.has(id)) {
+                    sendLed(id, sceneLedStates.get(id), undefined, false);
+                } else if (isActive && (id === 91 || loadingSnakeTrail.has(id))) {
+                    sendLed(id, ORANGE_LED, undefined, false);
+                } else {
+                    sendLed(id, 0, undefined, false);
+                }
+            }
+        }
+
+        function scheduleLoadingSnake(startIndex) {
+            for (let index = startIndex; index < loadingSnakePadIds.length; index += 1) {
+                sendLed(
+                    loadingSnakePadIds[index],
+                    ORANGE_LED,
+                    loadingSnakeStartedAt + index * loadingSnakeStepDuration,
+                    false
+                );
+            }
+        }
+
+        function setLoadingBlink(isActive, { durationMs, reset = false } = {}) {
+            if (isActive) {
+                if (midiOutput && typeof midiOutput.clear === 'function') midiOutput.clear();
+                stopAnimationPlayback();
+                loadingBlinkActive = true;
+                loadingSnakeStepDuration = Number.isFinite(durationMs) && durationMs > 0
+                    ? durationMs / (loadingSnakePadIds.length - 1)
+                    : 120;
+                loadingSnakeStartedAt = performance.now() + 50;
+                loadingSnakeTrail.clear();
+                loadingSnakeTrail.add(loadingSnakePadIds[0]);
+                renderLoadingBlink(true);
+                if (durationMs === 0) {
+                    loadingSnakePadIds.forEach(id => loadingSnakeTrail.add(id));
+                    renderLoadingBlink(true);
+                } else {
+                    scheduleLoadingSnake(1);
+                }
+                return;
+            }
+
+            if (midiOutput && typeof midiOutput.clear === 'function') midiOutput.clear();
+            loadingBlinkActive = false;
+            if (reset) {
+                loadingSnakeTrail.clear();
+                renderLoadingBlink(false);
+            } else {
+                renderLoadingBlink(false);
+            }
+        }
+
+        function applyRemoteAnimationFrame(litIds) {
+            const nextLitPads = new Set(litIds);
+            if (!receivedRemoteAnimationFrame) {
+                launchpadGridPadIds.forEach(id => sendLed(id, 0, undefined, false));
+                receivedRemoteAnimationFrame = true;
+            }
+            for (const id of remoteAnimationLitPads) {
+                if (!nextLitPads.has(id) && !pendingBlinkPads.has(id)) {
+                    sendLed(id, 0, undefined, false);
+                }
+            }
+            for (const id of nextLitPads) {
+                if (!remoteAnimationLitPads.has(id) && !pendingBlinkPads.has(id)) {
+                    sendLed(id, ORANGE_LED, undefined, false);
+                }
+            }
+            remoteAnimationLitPads.clear();
+            nextLitPads.forEach(id => remoteAnimationLitPads.add(id));
+        }
+
+        function publishPendingBlinkFrame() {
+            midiChannel.publish('led', {
+                type: 'pending-blink-frame',
+                senderId: ledPublisherId,
+                sequence: ++ledMessageSequence,
+                padIds: [...pendingBlinkPads],
+                isOn: pendingBlinkOn
+            }).catch(error => {
+                console.error('Failed to publish Launchpad pending blink state:', error);
+            });
+        }
+
+        function setPendingBlinkPads(nextPadIds) {
+            const nextPads = new Set(nextPadIds);
+            const removedPads = [...pendingBlinkPads].filter(id => !nextPads.has(id));
+            const addedPads = [...nextPads].filter(id => !pendingBlinkPads.has(id));
+
+            pendingBlinkPads.clear();
+            nextPads.forEach(id => pendingBlinkPads.add(id));
+
+            for (const id of removedPads) {
+                sendLed(
+                    id,
+                    animationLitPads.has(id) || remoteAnimationLitPads.has(id)
+                        ? ORANGE_LED
+                        : sceneLedStates.get(id) ?? 0,
+                    undefined,
+                    false
+                );
+            }
+            if (addedPads.length) {
+                pendingBlinkOn = true;
+                addedPads.forEach(id => sendLed(id, WHITE_LED, undefined, false));
+            }
+            publishPendingBlinkFrame();
+
+            if (pendingBlinkPads.size && pendingBlinkTimer === null) {
+                pendingBlinkTimer = window.setInterval(() => {
+                    pendingBlinkOn = !pendingBlinkOn;
+                    pendingBlinkPads.forEach(id => {
+                        sendLed(id, pendingBlinkOn ? WHITE_LED : 0, undefined, false);
+                    });
+                    publishPendingBlinkFrame();
+                }, 250);
+            } else if (!pendingBlinkPads.size && pendingBlinkTimer !== null) {
+                window.clearInterval(pendingBlinkTimer);
+                pendingBlinkTimer = null;
+                pendingBlinkOn = false;
+            }
+        }
+
+        midiChannel.subscribe('led', message => {
+            const data = message.data;
+            if (!data || typeof data !== 'object') return;
+            if (data.senderId === ledPublisherId) return;
+
+            if (data.type === 'animation-frame') {
+                if (
+                    !Array.isArray(data.litIds) ||
+                    !data.litIds.every(id => Number.isInteger(id) && launchpadGridPadIds.has(id))
+                ) return;
+                applyRemoteAnimationFrame(data.litIds);
+                return;
+            }
+            if (data.type === 'clear-animation') {
+                applyRemoteAnimationFrame([]);
+                receivedRemoteAnimationFrame = false;
+                return;
+            }
+            if (data.type === 'loading-blink' && typeof data.isActive === 'boolean') {
+                setLoadingBlink(data.isActive, data);
+                return;
+            }
+            if (
+                !Number.isInteger(data.id) ||
+                !pads.has(data.id) ||
+                !Number.isInteger(data.velocity) ||
+                data.velocity < 0 ||
+                data.velocity > 127
+            ) return;
+
+            if (sceneLedStates.has(data.id)) sceneLedStates.set(data.id, data.velocity);
+            sendLed(data.id, data.velocity, undefined, false);
+        });
+
+        function pressPad(id) {
+            if (pressedPads.has(id)) return;
+            pressedPads.add(id);
+            pads.get(id)?.classList.add('active');
+            if (!padAnimations.has(id)) sendLed(id, ORANGE_LED, undefined, false);
+            sendLooperMessage({ type: 'launchpad-input', id, isDown: true });
+            midiChannel.publish('midi', {
+                id,
+                isDown: true,
+                animationControlsLight: padAnimations.has(id),
+                senderId: ledPublisherId,
+                sequence: ++ledMessageSequence
+            });
+        }
+
+        function releasePad(id) {
+            if (!pressedPads.delete(id)) return;
+            pads.get(id)?.classList.remove('active');
+            if (!padAnimations.has(id)) {
+                sendLed(id, sceneLedStates.get(id) ?? 0, undefined, false);
+            }
+            sendLooperMessage({ type: 'launchpad-input', id, isDown: false });
+            midiChannel.publish('midi', {
+                id,
+                isDown: false,
+                animationControlsLight: padAnimations.has(id),
+                senderId: ledPublisherId,
+                sequence: ++ledMessageSequence
+            });
+        }
+
+        async function setLaunchpadPresence(isConnected) {
+            if (launchpadPresenceActive === isConnected) return;
+            launchpadPresenceActive = isConnected;
+            try {
+                if (isConnected) {
+                    await midiChannel.presence.enter({ instrument: 'launchpad' });
+                } else {
+                    await midiChannel.presence.leave();
+                }
+            } catch (error) {
+                launchpadPresenceActive = !isConnected;
+                console.error('Failed to update Launchpad presence:', error);
+            }
+        }
+
+        function handleMidiMessage(event) {
+            const [statusByte, number, velocity] = event.data;
+            const command = statusByte & 0xf0;
+            let id;
+            let isDown;
+
+            if (command === 0x90 || command === 0x80) {
+                id = number;
+                isDown = command === 0x90 && velocity > 0;
+            } else if (command === 0xb0 && number >= 104 && number <= 111) {
+                id = number - 13;
+                isDown = velocity > 0;
+            } else {
+                return;
+            }
+
+            if (!pads.has(id)) return;
+            if (isDown) {
+                if (hardwarePressedPads.has(id)) return;
+                hardwarePressedPads.add(id);
+            } else {
+                hardwarePressedPads.delete(id);
+            }
+            document.getElementById('pressed-buttons-value').textContent =
+                hardwarePressedPads.size
+                    ? [...hardwarePressedPads].sort((a, b) => a - b).join(' · ')
+                    : 'None';
+            if (isDown) {
+                pressPad(id);
+            } else {
+                releasePad(id);
+            }
+        }
+
+        async function toggleLaunchpadConnection() {
+            const connectButton = document.getElementById('connect');
+            if (midiInput || midiOutput) {
+                stopAnimationPlayback();
+                if (midiInput) midiInput.onmidimessage = null;
+                midiInput = null;
+                midiOutput = null;
+                initializedMidiOutput = null;
+                void setLaunchpadPresence(false);
+                connectButton.textContent = 'Connect';
+                connectButton.title = 'Connect Launchpad';
+                return;
+            }
+
+            if (!navigator.requestMIDIAccess) {
+                connectButton.title = 'Web MIDI is not supported by this browser.';
+                return;
+            }
+
+            try {
+                midiAccess = await navigator.requestMIDIAccess();
+                midiAccess.onstatechange = updateMidiPorts;
+                updateMidiPorts();
+            } catch (error) {
+                connectButton.title = `MIDI connection failed: ${error.message}`;
+            }
+        }
+
+        function updateMidiPorts() {
+            const inputs = [...midiAccess.inputs.values()];
+            const outputs = [...midiAccess.outputs.values()];
+            const isLaunchpad = port => /launchpad|novation|\blp\b/i.test(port.name);
+            midiInput = inputs.find(isLaunchpad) || inputs[0] || null;
+            midiOutput = outputs.find(isLaunchpad) || outputs[0] || null;
+
+            if (midiOutput && midiOutput !== initializedMidiOutput) {
+                initializeLaunchpadOutput(midiOutput);
+            } else if (!midiOutput) {
+                initializedMidiOutput = null;
+            }
+
+            if (midiOutput && loadingBlinkActive) {
+                if (typeof midiOutput.clear === 'function') midiOutput.clear();
+                const currentIndex = Math.min(
+                    loadingSnakePadIds.length - 1,
+                    Math.max(0, Math.floor((performance.now() - loadingSnakeStartedAt) / loadingSnakeStepDuration))
+                );
+                loadingSnakeTrail.clear();
+                loadingSnakePadIds.slice(0, currentIndex + 1).forEach(id => loadingSnakeTrail.add(id));
+                renderLoadingBlink(true);
+                scheduleLoadingSnake(currentIndex + 1);
+            }
+            if (midiInput) midiInput.onmidimessage = handleMidiMessage;
+            void setLaunchpadPresence(Boolean(midiInput || midiOutput));
+            if (!midiInput && !midiOutput) {
+                document.getElementById('connect').textContent = 'Connect';
+                document.getElementById('connect').title =
+                'No MIDI device found. Connect your Launchpad and try again.';
+            } else {
+                const name = midiInput?.name || midiOutput?.name || 'MIDI device';
+                document.getElementById('connect').textContent = 'On';
+                document.getElementById('connect').title = `Connected: ${name}`;
+            }
+        }
+
+        document.getElementById('connect').addEventListener('click', toggleLaunchpadConnection);
+
+        const studioGrid = document.getElementById('studio-grid');
+        const studioKeyframes = document.getElementById('studio-keyframes');
+        const studioStatus = document.getElementById('studio-status');
+        const padAnimations = new Map();
+        const remoteLooperActivePadIds = new Set();
+        let editorFrames = [];
+        const activeAnimations = new Map();
+        const previewAnimationKey = 'preview';
+        const ANIMATION_FRAME_COUNT = 24;
+        let looperBpm = 140;
+        const padAnimationSpeeds = new Map();
+        const animationLitPads = new Set();
+        let selectedPadId = null;
+        let activeStudioPreset = null;
+        let paintingFrame = null;
+        let paintValue = false;
+        let workspaceSaveTimer = null;
+        const allStudioPadIds = Array.from({ length: 8 }, (_, row) =>
+            Array.from({ length: 8 }, (_, column) => (8 - row) * 10 + column + 1)
+        ).flat();
+
+        function sendLooperMessage(message) {
+            if (looperChannel) {
+                looperChannel.postMessage({ ...message, senderId: ledPublisherId });
+            }
+        }
+        const sampleAnimations = (() => {
+            const square = (minRow, maxRow, minColumn, maxColumn) =>
+                allStudioPadIds.filter(id => {
+                    const row = Math.floor(id / 10);
+                    const column = id % 10;
+                    return row >= minRow && row <= maxRow && column >= minColumn && column <= maxColumn;
+                });
+            return {
+                pulse: [
+                    { duration: 180, lit: square(4, 5, 4, 5) },
+                    { duration: 180, lit: square(3, 6, 3, 6) },
+                    { duration: 180, lit: square(2, 7, 2, 7) },
+                    { duration: 180, lit: square(1, 8, 1, 8) },
+                    { duration: 180, lit: [] }
+                ],
+                fade: Array.from({ length: 8 }, (_, index) => ({
+                    duration: 160,
+                    lit: allStudioPadIds.slice(0, Math.round(allStudioPadIds.length * (index + 1) / 8))
+                })),
+                chase: Array.from({ length: 8 }, (_, index) => ({
+                    duration: 140,
+                    lit: allStudioPadIds.filter(id => id % 10 === index + 1)
+                })),
+                spark: [
+                    { duration: 120, lit: [11, 24, 37, 48, 52, 65, 78, 83] },
+                    { duration: 120, lit: [13, 26, 31, 45, 57, 62, 74, 88] },
+                    { duration: 120, lit: [16, 21, 34, 47, 53, 68, 72, 85] },
+                    { duration: 120, lit: [12, 28, 33, 46, 51, 64, 77, 82] }
+                ]
+            };
+        })();
+        let presetDatabase;
+
+        function setStudioStatus(message) {
+            studioStatus.textContent = message;
+        }
+
+        function normalizeAnimationSpeed(speed) {
+            return [1, 2, 4].includes(Number(speed)) ? Number(speed) : 1;
+        }
+
+        function getPadAnimationSpeed(id) {
+            return normalizeAnimationSpeed(padAnimationSpeeds.get(id));
+        }
+
+        function getAnimationFrameDuration(speedMultiplier = 1) {
+            return 60000 / looperBpm / speedMultiplier;
+        }
+
+        function updateAnimationTimingLabel() {
+            const speedMultiplier = selectedPadId === null ? 1 : getPadAnimationSpeed(selectedPadId);
+            const frameDuration = getAnimationFrameDuration(speedMultiplier);
+            document.getElementById('studio-animation-timing').textContent =
+                `${speedMultiplier} frame${speedMultiplier === 1 ? '' : 's'} per beat at ${looperBpm} BPM (about ${Math.round(frameDuration)} ms per frame).`;
+        }
+
+        function syncAnimationSpeedControls() {
+            const speed2 = document.getElementById('studio-animation-speed-2');
+            const speed4 = document.getElementById('studio-animation-speed-4');
+            const speedMultiplier = selectedPadId === null ? 1 : getPadAnimationSpeed(selectedPadId);
+            speed2.checked = speedMultiplier === 2;
+            speed4.checked = speedMultiplier === 4;
+            speed2.disabled = selectedPadId === null;
+            speed4.disabled = selectedPadId === null;
+            updateAnimationTimingLabel();
+        }
+
+        function retimeActiveAnimations(padId = null, speedMultiplier = null) {
+            activeAnimations.forEach((animation, animationKey) => {
+                if (padId !== null && animationKey !== padId) return;
+                if (speedMultiplier !== null) animation.speedMultiplier = speedMultiplier;
+                const frameDuration = getAnimationFrameDuration(animation.speedMultiplier);
+                const elapsed = performance.now() - animation.frameStartedAt;
+                const elapsedRatio = Math.min(1, elapsed / animation.frameDuration);
+                animation.frameDuration = frameDuration;
+                window.clearTimeout(animation.timer);
+                animation.timer = window.setTimeout(
+                    animation.advanceFrame,
+                    frameDuration * (1 - elapsedRatio)
+                );
+            });
+        }
+
+        function updateAnimationSpeed() {
+            if (selectedPadId === null) {
+                syncAnimationSpeedControls();
+                return;
+            }
+            const speedMultiplier = document.getElementById('studio-animation-speed-4').checked
+                ? 4
+                : document.getElementById('studio-animation-speed-2').checked ? 2 : 1;
+            padAnimationSpeeds.set(selectedPadId, speedMultiplier);
+            syncAnimationSpeedControls();
+            retimeActiveAnimations(selectedPadId, speedMultiplier);
+            scheduleWorkspaceSave();
+        }
+
+        function syncLooperTempo(data) {
+            if (!Number.isFinite(data.bpm) || data.bpm < 60 || data.bpm > 180) return;
+            if (data.bpm === looperBpm) return;
+            looperBpm = data.bpm;
+            retimeActiveAnimations();
+            updateAnimationTimingLabel();
+        }
+
+        function normalizeFrames(frames, legacyPadId) {
+            const blankFrames = () => Array.from(
+                { length: ANIMATION_FRAME_COUNT },
+                () => ({ lit: [] })
+            );
+            if (!Array.isArray(frames) || !frames.length) return blankFrames();
+
+            let sourceFrames;
+            if (frames.every(frame => frame && Array.isArray(frame.lit))) {
+                sourceFrames = frames.map(frame => ({
+                    lit: [...new Set(frame.lit.map(Number).filter(id => allStudioPadIds.includes(id)))]
+                }));
+            } else if (frames.every(frame =>
+                frame && Number.isFinite(frame.time) && Number.isFinite(frame.level)
+            )) {
+                sourceFrames = frames.map(frame => ({
+                    lit: frame.level >= 0.5
+                        ? (legacyPadId ? [legacyPadId] : [...allStudioPadIds])
+                        : []
+                }));
+            } else {
+                return blankFrames();
+            }
+
+            return Array.from({ length: ANIMATION_FRAME_COUNT }, (_, index) => ({
+                lit: sourceFrames[Math.floor(index * sourceFrames.length / ANIMATION_FRAME_COUNT)].lit
+            }));
+        }
+
+        function updateSelectedAnimation() {
+            if (selectedPadId === null) {
+                scheduleWorkspaceSave();
+                return;
+            }
+            const frames = readAnimationFrames();
+            if (!frames.some(frame => frame.lit.length)) {
+                padAnimations.delete(selectedPadId);
+                scheduleWorkspaceSave();
+                setStudioStatus(`Animation cleared from button ${selectedPadId}.`);
+                return;
+            }
+            padAnimations.set(selectedPadId, {
+                frames: frames.map(frame => ({ lit: [...frame.lit] })),
+                animationSource: document.getElementById('studio-animation').value
+            });
+            scheduleWorkspaceSave();
+        }
+
+        function normalizeAnimationAssignment(value, id) {
+            if (Array.isArray(value)) {
+                const frames = normalizeFrames(value, id);
+                return { frames };
+            }
+            if (!value || !Array.isArray(value.frames)) return null;
+            return {
+                frames: normalizeFrames(value.frames, id),
+                animationSource: typeof value.animationSource === 'string' ? value.animationSource : null
+            };
+        }
+
+        function studioPadCoordinates(id) {
+            return { row: 8 - Math.floor(id / 10), column: id % 10 - 1 };
+        }
+
+        function createStudioPresetFrames(centerId, presetNumber) {
+            const center = studioPadCoordinates(centerId);
+            const pads = allStudioPadIds.map(id => ({ id, ...studioPadCoordinates(id) }))
+                .filter(pad => pad.id !== centerId);
+            const sequence = [];
+            const lit = new Set([centerId]);
+            const addTimedEffects = entries => {
+                const groups = new Map();
+                for (const entry of entries) {
+                    if (!groups.has(entry.delay)) groups.set(entry.delay, []);
+                    groups.get(entry.delay).push(entry.id);
+                }
+                sequence.push({ lit: [...lit] });
+                for (const [, ids] of [...groups.entries()].sort((a, b) => a[0] - b[0])) {
+                    ids.forEach(id => lit.add(id));
+                    sequence.push({ lit: [...lit] });
+                }
+            };
+
+            switch (presetNumber) {
+                case 1:
+                    sequence.push({ lit: [centerId] });
+                    break;
+                case 2: {
+                    const effects = pads
+                        .map(pad => ({
+                            id: pad.id,
+                            distance: Math.hypot(pad.row - center.row, pad.column - center.column)
+                        }))
+                        .filter(pad => pad.distance <= 4.5)
+                        .map(pad => ({ id: pad.id, delay: pad.distance * 50 }));
+                    addTimedEffects(effects);
+                    break;
+                }
+                case 3: {
+                    const effects = pads
+                        .filter(pad => pad.row === center.row || pad.column === center.column)
+                        .map(pad => ({
+                            id: pad.id,
+                            delay: (Math.abs(pad.row - center.row) + Math.abs(pad.column - center.column)) * 30
+                        }));
+                    addTimedEffects(effects);
+                    break;
+                }
+                case 4: {
+                    const effects = pads
+                        .map(pad => ({
+                            id: pad.id,
+                            distance: Math.abs(pad.row - center.row) + Math.abs(pad.column - center.column)
+                        }))
+                        .filter(pad => pad.distance <= 5)
+                        .map(pad => ({ id: pad.id, delay: pad.distance * 55 }));
+                    addTimedEffects(effects);
+                    break;
+                }
+                case 5: {
+                    const nearby = pads
+                        .filter(pad => Math.hypot(pad.row - center.row, pad.column - center.column) <= 3.2)
+                        .sort((a, b) => ((a.id * 17 + centerId * 31) % 97) - ((b.id * 17 + centerId * 31) % 97))
+                        .slice(0, 7);
+                    addTimedEffects(nearby.map((pad, index) => ({ id: pad.id, delay: index * 30 })));
+                    break;
+                }
+                case 6: {
+                    const effects = pads
+                        .filter(pad => pad.column === center.column)
+                        .map(pad => ({ id: pad.id, delay: Math.abs(pad.row - center.row) * 45 }));
+                    addTimedEffects(effects);
+                    break;
+                }
+                case 7: {
+                    const effects = pads
+                        .sort((a, b) => Math.atan2(a.row - center.row, a.column - center.column) -
+                            Math.atan2(b.row - center.row, b.column - center.column))
+                        .slice(0, 10)
+                        .map((pad, index) => ({ id: pad.id, delay: index * 25 }));
+                    addTimedEffects(effects);
+                    break;
+                }
+                case 8:
+                    sequence.push({ lit: [...allStudioPadIds] });
+                    break;
+                default:
+                    return [];
+            }
+            return normalizeFrames(sequence.length ? sequence : [{ lit: [centerId] }], null);
+        }
+
+        function renderEditorFrames() {
+            studioKeyframes.replaceChildren();
+            editorFrames.forEach((frame, frameIndex) => {
+                const card = document.createElement('div');
+                card.className = 'animation-frame';
+                const header = document.createElement('div');
+                header.className = 'animation-frame-header';
+                const label = document.createElement('span');
+                label.textContent = `Frame ${frameIndex + 1}`;
+                header.append(label);
+                const frameMatrix = document.createElement('div');
+                frameMatrix.className = 'frame-matrix';
+                frameMatrix.setAttribute('aria-label', `Frame ${frameIndex + 1} light matrix`);
+                for (let row = 8; row >= 1; row--) {
+                    for (let column = 1; column <= 8; column++) {
+                        const id = row * 10 + column;
+                        const cell = document.createElement('button');
+                        cell.type = 'button';
+                        cell.className = 'frame-pad';
+                        cell.textContent = String(id);
+                        cell.classList.toggle('on', frame.lit.includes(id));
+                        cell.setAttribute('aria-label', `Frame ${frameIndex + 1}, button ${id}`);
+                        cell.setAttribute('aria-pressed', String(frame.lit.includes(id)));
+                        const paintCell = () => {
+                            const isLit = frame.lit.includes(id);
+                            if (isLit === paintValue) return;
+                            activeStudioPreset = null;
+                            document.getElementById('studio-animation').value = 'custom';
+                            if (paintValue) frame.lit.push(id);
+                            else frame.lit = frame.lit.filter(litId => litId !== id);
+                            cell.classList.toggle('on', frame.lit.includes(id));
+                            cell.setAttribute('aria-pressed', String(frame.lit.includes(id)));
+                            updateSelectedAnimation();
+                        };
+                        cell.addEventListener('pointerdown', event => {
+                            if (!event.isPrimary || (event.pointerType === 'mouse' && event.button !== 0)) return;
+                            event.preventDefault();
+                            paintingFrame = frame;
+                            paintValue = !frame.lit.includes(id);
+                            paintCell();
+                        });
+                        cell.addEventListener('pointerenter', () => {
+                            if (paintingFrame === frame) paintCell();
+                        });
+                        cell.addEventListener('click', event => {
+                            if (event.detail !== 0) return;
+                            paintValue = !frame.lit.includes(id);
+                            paintCell();
+                        });
+                        frameMatrix.appendChild(cell);
+                    }
+                }
+                card.append(header, frameMatrix);
+                studioKeyframes.appendChild(card);
+            });
+        }
+
+        function readAnimationFrames() {
+            return normalizeFrames(editorFrames, null).map(frame => ({ lit: frame.lit }));
+        }
+
+        function loadSampleAnimation(name) {
+            if (name === 'custom') return;
+            editorFrames = normalizeFrames(sampleAnimations[name], null);
+            renderEditorFrames();
+            updateSelectedAnimation();
+        }
+
+        window.addEventListener('pointerup', () => {
+            paintingFrame = null;
+        });
+        window.addEventListener('pointercancel', () => {
+            paintingFrame = null;
+        });
+
+        for (let row = 8; row >= 1; row--) {
+            for (let column = 1; column <= 8; column++) {
+                const id = row * 10 + column;
+                const pad = document.createElement('button');
+                pad.type = 'button';
+                pad.className = 'studio-pad';
+                pad.textContent = String(id);
+                pad.setAttribute('aria-label', `Studio button ${id}`);
+                pad.addEventListener('click', () => {
+                    selectStudioPad(id, pad);
+                });
+                pad.dataset.id = String(id);
+                studioGrid.appendChild(pad);
+            }
+        }
+
+        const studioGridPadIds = new Set(
+            [...studioGrid.querySelectorAll('.studio-pad')].map(pad => Number(pad.dataset.id))
+        );
+
+        function applyAnimationFrame() {
+            const nextLitPads = new Set();
+            activeAnimations.forEach(animation => {
+                animation.lit.forEach(id => nextLitPads.add(id));
+            });
+            for (const id of animationLitPads) {
+                if (!nextLitPads.has(id) && !pendingBlinkPads.has(id)) {
+                    sendLed(id, 0, undefined, false);
+                }
+            }
+            for (const id of nextLitPads) {
+                if (!animationLitPads.has(id) && !pendingBlinkPads.has(id)) {
+                    sendLed(id, ORANGE_LED, undefined, false);
+                }
+            }
+            animationLitPads.clear();
+            nextLitPads.forEach(id => animationLitPads.add(id));
+            studioGrid.querySelectorAll('.studio-pad').forEach(pad => {
+                pad.classList.toggle('playing', nextLitPads.has(Number(pad.dataset.id)));
+            });
+            midiChannel.publish('led', {
+                type: 'animation-frame',
+                senderId: ledPublisherId,
+                sequence: ++ledMessageSequence,
+                litIds: [...nextLitPads].filter(id => studioGridPadIds.has(id))
+            }).catch(error => {
+                console.error('Failed to publish Launchpad animation frame:', error);
+            });
+        }
+
+        function stopAnimationPlayback(triggerId = null) {
+            if (triggerId === null) {
+                activeAnimations.forEach(animation => window.clearTimeout(animation.timer));
+                activeAnimations.clear();
+            } else {
+                const animation = activeAnimations.get(triggerId);
+                if (!animation) return;
+                window.clearTimeout(animation.timer);
+                activeAnimations.delete(triggerId);
+            }
+            applyAnimationFrame();
+        }
+
+        function playAnimationOnGrid(frames, triggerId = null, keepLooping = false) {
+            const animationKey = triggerId ?? previewAnimationKey;
+            if (!frames.length) {
+                stopAnimationPlayback(animationKey);
+                return;
+            }
+            stopAnimationPlayback(animationKey);
+            const animation = {
+                frames,
+                speedMultiplier: Number.isInteger(animationKey) ? getPadAnimationSpeed(animationKey) : 1,
+                frameDuration: getAnimationFrameDuration(
+                    Number.isInteger(animationKey) ? getPadAnimationSpeed(animationKey) : 1
+                ),
+                frameStartedAt: 0,
+                frameIndex: 0,
+                lit: new Set(),
+                timer: null,
+                advanceFrame: null
+            };
+            activeAnimations.set(animationKey, animation);
+            function showNextFrame() {
+                if (activeAnimations.get(animationKey) !== animation) return;
+                if (animation.frameIndex >= frames.length) {
+                    if (keepLooping) {
+                        animation.frameIndex = 0;
+                    } else {
+                        activeAnimations.delete(animationKey);
+                        applyAnimationFrame();
+                        return;
+                    }
+                }
+                animation.lit = new Set(frames[animation.frameIndex].lit);
+                animation.frameIndex++;
+                applyAnimationFrame();
+                animation.frameStartedAt = performance.now();
+                animation.timer = window.setTimeout(showNextFrame, animation.frameDuration);
+            }
+            animation.advanceFrame = showNextFrame;
+            showNextFrame();
+        }
+
+        function playStudioPad(id) {
+            const pad = studioGrid.querySelector(`[data-id="${id}"]`);
+            if (!pad) return;
+            const assignment = normalizeAnimationAssignment(padAnimations.get(id), id);
+            if (!assignment) {
+                if (remoteLooperActivePadIds.has(id)) stopAnimationPlayback(id);
+                return;
+            }
+            const looperDriven = remoteLooperActivePadIds.has(id);
+            if (looperDriven) {
+                playAnimationOnGrid(assignment.frames, id, true);
+                return;
+            }
+            playAnimationOnGrid(assignment.frames);
+        }
+
+        function syncLooperAnimationState(data) {
+            syncLooperTempo(data);
+            if (!Array.isArray(data.pads)) return;
+            const activeIds = new Set();
+            const pendingStartIds = new Set();
+            const pendingStopIds = new Set();
+            for (const pad of data.pads) {
+                if (
+                    !pad ||
+                    !Number.isInteger(pad.launchpadId) ||
+                    !allStudioPadIds.includes(pad.launchpadId)
+                ) continue;
+                if (pad.state === 'PENDING_START') {
+                    pendingStartIds.add(pad.launchpadId);
+                } else if (pad.state === 'PLAYING' || pad.state === 'PENDING_STOP') {
+                    activeIds.add(pad.launchpadId);
+                }
+                if (pad.state === 'PENDING_STOP') {
+                    pendingStopIds.add(pad.launchpadId);
+                }
+            }
+
+            for (const id of remoteLooperActivePadIds) {
+                if (!activeIds.has(id)) stopAnimationPlayback(id);
+            }
+            const newlyActiveIds = [...activeIds].filter(id => !remoteLooperActivePadIds.has(id));
+            remoteLooperActivePadIds.clear();
+            activeIds.forEach(id => remoteLooperActivePadIds.add(id));
+            newlyActiveIds.forEach(id => playStudioPad(id));
+            pendingStartIds.forEach(id => pendingStopIds.add(id));
+            setPendingBlinkPads(pendingStopIds);
+        }
+
+        if (looperChannel) {
+            looperChannel.addEventListener('message', event => {
+                if (event.data?.type === 'looper-state') {
+                    syncLooperAnimationState(event.data);
+                }
+            });
+            sendLooperMessage({ type: 'sender-ready' });
+            window.setTimeout(() => sendLooperMessage({ type: 'sender-ready' }), 500);
+        } else {
+            console.error('Cross-page audio control requires BroadcastChannel support.');
+        }
+
+        function assignAnimationToPad(id, pad) {
+            const presetMatch = activeStudioPreset?.match(/^studio-preset:(\d)$/);
+            const frames = presetMatch
+                ? createStudioPresetFrames(id, Number(presetMatch[1]))
+                : readAnimationFrames();
+            if (!frames.some(frame => frame.lit.length)) {
+                setStudioStatus('Light at least one pad in the animation before assigning it.');
+                return;
+            }
+            if (presetMatch) {
+                editorFrames = frames.map(frame => ({ lit: [...frame.lit] }));
+                renderEditorFrames();
+            }
+            padAnimations.set(id, {
+                frames: frames.map(frame => ({ lit: [...frame.lit] })),
+                animationSource: document.getElementById('studio-animation').value
+            });
+            scheduleWorkspaceSave();
+            studioGrid.querySelectorAll('.studio-pad').forEach(button => button.classList.remove('selected'));
+            pad.classList.add('selected');
+            selectedPadId = id;
+            document.getElementById('studio-selection-count').textContent = `Button ${id} selected`;
+            syncAnimationSpeedControls();
+            playStudioPad(id);
+            setStudioStatus(`Animation applied to button ${id}. Changes apply automatically.`);
+        }
+
+        function selectStudioPad(id, pad) {
+            studioGrid.querySelectorAll('.studio-pad').forEach(button => button.classList.remove('selected'));
+            pad.classList.add('selected');
+            selectedPadId = id;
+            document.getElementById('studio-selection-count').textContent = `Button ${id} selected`;
+            syncAnimationSpeedControls();
+
+            const assignment = normalizeAnimationAssignment(padAnimations.get(id), id);
+            if (assignment) {
+                editorFrames = assignment.frames.map(frame => ({ lit: [...frame.lit] }));
+                const source = assignment.animationSource;
+                const animationSelect = document.getElementById('studio-animation');
+                animationSelect.value = source && [...animationSelect.options].some(option => option.value === source)
+                    ? source
+                    : 'custom';
+                activeStudioPreset = source?.startsWith('studio-preset:') ? source : null;
+                renderEditorFrames();
+                playStudioPad(id);
+                setStudioStatus(`Button ${id} selected. Its animation is loaded; changes apply automatically.`);
+                scheduleWorkspaceSave();
+                return;
+            }
+
+            const animationSelect = document.getElementById('studio-animation');
+            activeStudioPreset = null;
+            animationSelect.value = 'custom';
+            editorFrames = normalizeFrames([], null);
+            renderEditorFrames();
+            setStudioStatus(`Button ${id} selected. Choose an animation or paint its 24 frames.`);
+            scheduleWorkspaceSave();
+        }
+
+        document.getElementById('studio-animation').addEventListener('change', event => {
+            const animationName = event.target.value;
+            if (animationName === 'custom') {
+                activeStudioPreset = null;
+                return;
+            } else if (animationName.startsWith('studio-preset:')) {
+                activeStudioPreset = animationName;
+                const presetNumber = Number(animationName.split(':')[1]);
+                const frames = createStudioPresetFrames(selectedPadId || 44, presetNumber);
+                editorFrames = frames.map(frame => ({ lit: [...frame.lit] }));
+                renderEditorFrames();
+                updateSelectedAnimation();
+                setStudioStatus('Studio preset ready. Click a Launchpad button to apply it.');
+                return;
+            } else if (sampleAnimations[animationName]) {
+                activeStudioPreset = null;
+                loadSampleAnimation(animationName);
+            } else if (animationName.startsWith('animation:')) {
+                activeStudioPreset = null;
+                runPresetTransaction('readonly', store => store.get(animationName)).then(animation => {
+                    if (!animation) {
+                        setStudioStatus('That saved animation is no longer available.');
+                        return;
+                    }
+                    editorFrames = normalizeFrames(animation.frames, null);
+                    renderEditorFrames();
+                    updateSelectedAnimation();
+                    setStudioStatus(`Animation "${animation.label}" loaded.`);
+                }).catch(error => setStudioStatus(`Could not load animation: ${error.message}`));
+            } else {
+                activeStudioPreset = null;
+                editorFrames = normalizeFrames([], null);
+                renderEditorFrames();
+            }
+        });
+        document.getElementById('studio-play-animation').addEventListener('click', () => {
+            playAnimationOnGrid(readAnimationFrames());
+        });
+        document.getElementById('studio-animation-speed-2').addEventListener('change', event => {
+            if (event.target.checked) {
+                document.getElementById('studio-animation-speed-4').checked = false;
+            }
+            updateAnimationSpeed();
+        });
+        document.getElementById('studio-animation-speed-4').addEventListener('change', event => {
+            if (event.target.checked) {
+                document.getElementById('studio-animation-speed-2').checked = false;
+            }
+            updateAnimationSpeed();
+        });
+        syncAnimationSpeedControls();
+        function openPresetDatabase() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('launchpad-studio-presets', 1);
+                request.onupgradeneeded = () => request.result.createObjectStore('presets', { keyPath: 'name' });
+                request.onsuccess = () => {
+                    presetDatabase = request.result;
+                    resolve(presetDatabase);
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        function runPresetTransaction(mode, operation) {
+            return new Promise((resolve, reject) => {
+                const transaction = presetDatabase.transaction('presets', mode);
+                const request = operation(transaction.objectStore('presets'));
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+                transaction.onabort = () => reject(transaction.error || new Error('Preset storage transaction failed.'));
+            });
+        }
+
+        function createWorkspaceRecord() {
+            return {
+                name: 'workspace:autosave',
+                type: 'workspace',
+                animations: [...padAnimations],
+                animationSpeeds: [...padAnimationSpeeds],
+                selectedPadId,
+                editorAnimation: document.getElementById('studio-animation').value,
+                editorFrames: readAnimationFrames()
+            };
+        }
+
+        function scheduleWorkspaceSave() {
+            window.clearTimeout(workspaceSaveTimer);
+            workspaceSaveTimer = window.setTimeout(async () => {
+                try {
+                    await runPresetTransaction('readwrite', store => store.put(createWorkspaceRecord()));
+                } catch (error) {
+                    setStudioStatus(`Could not save button assignments: ${error.message}`);
+                }
+            }, 120);
+        }
+
+        async function restoreWorkspace() {
+            const workspace = await runPresetTransaction('readonly', store => store.get('workspace:autosave'));
+            if (!workspace) return;
+            padAnimations.clear();
+            padAnimationSpeeds.clear();
+            (workspace.animations || []).forEach(([id, animation]) => {
+                const assignment = normalizeAnimationAssignment(animation, Number(id));
+                if (assignment) padAnimations.set(Number(id), assignment);
+            });
+            (workspace.animationSpeeds || []).forEach(([id, speed]) => {
+                if (allStudioPadIds.includes(Number(id))) {
+                    padAnimationSpeeds.set(Number(id), normalizeAnimationSpeed(speed));
+                }
+            });
+            const animationSelect = document.getElementById('studio-animation');
+            const savedAnimation = workspace.editorAnimation || 'custom';
+            animationSelect.value = [...animationSelect.options].some(option => option.value === savedAnimation)
+                ? savedAnimation
+                : 'custom';
+            activeStudioPreset = animationSelect.value.startsWith('studio-preset:')
+                ? animationSelect.value
+                : null;
+            editorFrames = normalizeFrames(workspace.editorFrames, null);
+            renderEditorFrames();
+
+            const selectedId = Number(workspace.selectedPadId);
+            if (allStudioPadIds.includes(selectedId)) {
+                selectedPadId = selectedId;
+                studioGrid.querySelector(`[data-id="${selectedId}"]`)?.classList.add('selected');
+                document.getElementById('studio-selection-count').textContent = `Button ${selectedId} selected`;
+            }
+            syncAnimationSpeedControls();
+            setStudioStatus('Your button animations have been restored.');
+        }
+
+        async function refreshPresetList() {
+            try {
+                const records = await runPresetTransaction('readonly', store => store.getAll());
+                const presetSelect = document.getElementById('studio-presets');
+                const animationSelect = document.getElementById('studio-animation');
+                presetSelect.replaceChildren(new Option('Saved presets', ''));
+                animationSelect.querySelectorAll('option[data-saved-animation]').forEach(option => option.remove());
+                records.sort((a, b) => (a.label || a.name).localeCompare(b.label || b.name));
+                for (const record of records) {
+                    if (record.type === 'workspace') continue;
+                    if (record.type === 'animation') {
+                        const option = new Option(`Saved: ${record.label}`, record.name);
+                        option.dataset.savedAnimation = 'true';
+                        animationSelect.add(option);
+                    } else {
+                        const label = record.label || record.name.replace(/^preset:/, '');
+                        presetSelect.add(new Option(label, record.name));
+                    }
+                }
+            } catch (error) {
+                setStudioStatus(`Could not read saved presets: ${error.message}`);
+            }
+        }
+
+        document.getElementById('studio-save-animation').addEventListener('click', async () => {
+            const label = document.getElementById('studio-animation-name').value.trim();
+            const frames = readAnimationFrames();
+            if (!label) {
+                setStudioStatus('Enter a name for this animation.');
+                return;
+            }
+            if (!frames.some(frame => frame.lit.length)) {
+                setStudioStatus('Draw at least one frame before saving the animation.');
+                return;
+            }
+            const animation = {
+                name: `animation:${label}`,
+                type: 'animation',
+                label,
+                frames
+            };
+            try {
+                await runPresetTransaction('readwrite', store => store.put(animation));
+                await refreshPresetList();
+                document.getElementById('studio-animation').value = animation.name;
+                setStudioStatus(`Animation "${label}" saved. Use Save preset to save button assignments too.`);
+            } catch (error) {
+                setStudioStatus(`Could not save animation: ${error.message}`);
+            }
+        });
+
+        document.getElementById('studio-save-preset').addEventListener('click', async () => {
+            const name = document.getElementById('studio-preset-name').value.trim();
+            if (!name) {
+                setStudioStatus('Enter a name for this preset.');
+                return;
+            }
+            const preset = {
+                name: `preset:${name}`,
+                type: 'preset',
+                label: name,
+                animations: [...padAnimations].map(([id, frames]) => [id, frames]),
+                animationSpeeds: [...padAnimationSpeeds],
+                editorAnimation: document.getElementById('studio-animation').value,
+                editorFrames: readAnimationFrames()
+            };
+            try {
+                await runPresetTransaction('readwrite', store => store.put(preset));
+                await refreshPresetList();
+                document.getElementById('studio-presets').value = preset.name;
+                setStudioStatus(`Animation preset "${name}" saved on this page.`);
+            } catch (error) {
+                setStudioStatus(`Could not save preset: ${error.message}`);
+            }
+        });
+        document.getElementById('studio-load-preset').addEventListener('click', async () => {
+            const name = document.getElementById('studio-presets').value;
+            if (!name) {
+                setStudioStatus('Choose a saved preset first.');
+                return;
+            }
+            try {
+                const preset = await runPresetTransaction('readonly', store => store.get(name));
+                if (!preset) {
+                    setStudioStatus('That preset is no longer available.');
+                    await refreshPresetList();
+                    return;
+                }
+                padAnimations.clear();
+                padAnimationSpeeds.clear();
+                (preset.animations || []).forEach(([id, animation]) => {
+                    const assignment = normalizeAnimationAssignment(animation, Number(id));
+                    if (assignment) padAnimations.set(Number(id), assignment);
+                });
+                (preset.animationSpeeds || []).forEach(([id, speed]) => {
+                    if (allStudioPadIds.includes(Number(id))) {
+                        padAnimationSpeeds.set(Number(id), normalizeAnimationSpeed(speed));
+                    }
+                });
+                const animationSelect = document.getElementById('studio-animation');
+                const storedAnimation = preset.editorAnimation || 'custom';
+                if (![...animationSelect.options].some(option => option.value === storedAnimation)) {
+                    animationSelect.value = 'custom';
+                } else {
+                    animationSelect.value = storedAnimation;
+                }
+                activeStudioPreset = storedAnimation.startsWith('studio-preset:')
+                    ? storedAnimation
+                    : null;
+                editorFrames = normalizeFrames(preset.editorFrames, null);
+                renderEditorFrames();
+                syncAnimationSpeedControls();
+                scheduleWorkspaceSave();
+                setStudioStatus(`Preset "${preset.label || name.replace(/^preset:/, '')}" loaded.`);
+            } catch (error) {
+                setStudioStatus(`Could not load preset: ${error.message}`);
+            }
+        });
+        document.getElementById('studio-delete-preset').addEventListener('click', async () => {
+            const name = document.getElementById('studio-presets').value;
+            if (!name) {
+                setStudioStatus('Choose a saved preset first.');
+                return;
+            }
+            try {
+                await runPresetTransaction('readwrite', store => store.delete(name));
+                await refreshPresetList();
+                setStudioStatus(`Preset "${name}" deleted.`);
+            } catch (error) {
+                setStudioStatus(`Could not delete preset: ${error.message}`);
+            }
+        });
+
+        document.getElementById('studio-minimize').addEventListener('click', event => {
+            const studio = document.getElementById('studio');
+            const minimized = studio.classList.toggle('minimized');
+            event.currentTarget.textContent = minimized ? '+' : '−';
+            event.currentTarget.setAttribute('aria-expanded', String(!minimized));
+            event.currentTarget.setAttribute('aria-label', minimized ? 'Expand studio' : 'Minimize studio');
+        });
+
+        editorFrames = normalizeFrames([], null);
+        renderEditorFrames();
+        openPresetDatabase().then(async () => {
+            await refreshPresetList();
+            await restoreWorkspace();
+        }).catch(error => {
+            setStudioStatus(`Preset storage is unavailable: ${error.message}`);
+        });
+
+        window.addEventListener('pagehide', () => {
+            window.clearTimeout(workspaceSaveTimer);
+            if (pendingBlinkTimer !== null) {
+                window.clearInterval(pendingBlinkTimer);
+                pendingBlinkTimer = null;
+                pendingBlinkPads.forEach(id => sendLed(id, 0, undefined, false));
+                pendingBlinkPads.clear();
+            }
+            if (!presetDatabase) return;
+            try {
+                presetDatabase.transaction('presets', 'readwrite')
+                    .objectStore('presets')
+                    .put(createWorkspaceRecord());
+            } catch (error) {
+                console.error('Could not save button assignments before leaving:', error);
+            }
+        });
+    </script>
+</body>
+
+</html>
