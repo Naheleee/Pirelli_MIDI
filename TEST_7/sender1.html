@@ -1122,14 +1122,17 @@
             activeAnimations.forEach((animation, animationKey) => {
                 if (padId !== null && animationKey !== padId) return;
                 if (speedMultiplier !== null) animation.speedMultiplier = speedMultiplier;
+                const now = performance.now();
                 const frameDuration = getAnimationFrameDuration(animation.speedMultiplier);
-                const elapsed = performance.now() - animation.frameStartedAt;
+                const elapsed = Math.max(0, now - animation.frameStartedAt);
                 const elapsedRatio = Math.min(1, elapsed / animation.frameDuration);
                 animation.frameDuration = frameDuration;
+                animation.frameStartedAt = now - frameDuration * elapsedRatio;
+                animation.nextFrameAt = animation.frameStartedAt + frameDuration;
                 window.clearTimeout(animation.timer);
                 animation.timer = window.setTimeout(
                     animation.advanceFrame,
-                    frameDuration * (1 - elapsedRatio)
+                    Math.max(0, animation.nextFrameAt - now)
                 );
             });
         }
@@ -1453,13 +1456,15 @@
                 return;
             }
             stopAnimationPlayback(animationKey);
+            const startTime = performance.now();
             const animation = {
                 frames,
                 speedMultiplier: Number.isInteger(animationKey) ? getPadAnimationSpeed(animationKey) : 1,
                 frameDuration: getAnimationFrameDuration(
                     Number.isInteger(animationKey) ? getPadAnimationSpeed(animationKey) : 1
                 ),
-                frameStartedAt: 0,
+                frameStartedAt: startTime,
+                nextFrameAt: startTime,
                 frameIndex: 0,
                 lit: new Set(),
                 timer: null,
@@ -1468,20 +1473,36 @@
             activeAnimations.set(animationKey, animation);
             function showNextFrame() {
                 if (activeAnimations.get(animationKey) !== animation) return;
+                const now = performance.now();
+                const wait = animation.nextFrameAt - now;
+                if (wait > 0) {
+                    animation.timer = window.setTimeout(showNextFrame, wait);
+                    return;
+                }
+                const lateBy = now - animation.nextFrameAt;
+                const skippedFrames = Math.floor(lateBy / animation.frameDuration);
+                if (skippedFrames > 0) {
+                    animation.frameIndex += skippedFrames;
+                    animation.nextFrameAt += skippedFrames * animation.frameDuration;
+                }
                 if (animation.frameIndex >= frames.length) {
                     if (keepLooping) {
-                        animation.frameIndex = 0;
+                        animation.frameIndex %= frames.length;
                     } else {
                         activeAnimations.delete(animationKey);
                         applyAnimationFrame();
                         return;
                     }
                 }
+                animation.frameStartedAt = animation.nextFrameAt;
                 animation.lit = new Set(frames[animation.frameIndex].lit);
                 animation.frameIndex++;
                 applyAnimationFrame();
-                animation.frameStartedAt = performance.now();
-                animation.timer = window.setTimeout(showNextFrame, animation.frameDuration);
+                animation.nextFrameAt += animation.frameDuration;
+                animation.timer = window.setTimeout(
+                    showNextFrame,
+                    Math.max(0, animation.nextFrameAt - performance.now())
+                );
             }
             animation.advanceFrame = showNextFrame;
             showNextFrame();

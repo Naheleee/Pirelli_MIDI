@@ -227,7 +227,8 @@
           wrapper.style.fontFamily = `"${fontFamily}"`;
           midiChannel.publish('midi', {
             type: 'fontchange',
-            fontFamily
+            fontFamily,
+            source: 'sender2'
           });
         })
         .catch(error => {
@@ -357,12 +358,18 @@
         ){
           return;
         }
-        midiChannel.publish('midi', { type: 'noteon', note: midi })
+        const group = getGroupIndex(midi);
+        midiChannel.publish('midi', {
+          type: 'noteon',
+          note: midi,
+          source: 'sender2',
+          group
+        })
           .catch(error => {
             console.error('Failed to send keyboard MIDI note-on:', error);
           });
         if (!lettersReady || !whitePitchClasses.has(midi % 12)) return;
-        selectedGroup = getGroupIndex(midi);
+        selectedGroup = group;
         showSelectedGroup();
       }
 
@@ -372,7 +379,11 @@
           midi < firstMidiNote ||
           midi > lastMidiNote
         ) return;
-        midiChannel.publish('midi', { type: 'noteoff', note: midi })
+        midiChannel.publish('midi', {
+          type: 'noteoff',
+          note: midi,
+          source: 'sender2'
+        })
           .catch(error => {
             console.error('Failed to send keyboard MIDI note-off:', error);
           });

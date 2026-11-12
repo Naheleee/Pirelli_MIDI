@@ -1018,6 +1018,7 @@ let selectedGroup = count - 1;
 let lettersReady = false;
 let pendingMidiNote = null;
 let pendingMidiSource = null;
+let pendingMidiGroup = null;
 let activeMidiNote = null;
 let animationFrame = null;
 let animationStart = 0;
@@ -1094,14 +1095,19 @@ function animateGroup(group) {
     animationFrame = requestAnimationFrame(animateFrame);
 }
 
-function selectNote(note, source) {
+function selectNote(note, source, requestedGroup) {
     if (!isSelectableNote(note, source)) return;
     activeMidiNote = note;
-    const group = getGroupIndex(note, source);
+    const group = Number.isInteger(requestedGroup) &&
+        requestedGroup >= 0 &&
+        requestedGroup < count
+        ? requestedGroup
+        : getGroupIndex(note, source);
     setActiveSegment(group);
     if (!lettersReady) {
         pendingMidiNote = note;
         pendingMidiSource = source;
+        pendingMidiGroup = group;
         return;
     }
     animateGroup(group);
@@ -1112,6 +1118,7 @@ function releaseNote(note, source) {
     activeMidiNote = null;
     pendingMidiNote = null;
     pendingMidiSource = null;
+    pendingMidiGroup = null;
     setActiveSegment(null);
 }
 
@@ -1122,7 +1129,9 @@ Promise.all([
     fitText();
     lettersReady = true;
     if (pendingMidiNote !== null && activeMidiNote === pendingMidiNote) {
-        animateGroup(getGroupIndex(pendingMidiNote, pendingMidiSource));
+        animateGroup(
+            pendingMidiGroup ?? getGroupIndex(pendingMidiNote, pendingMidiSource)
+        );
     } else applyWidths(animationTo);
     updateLetterTrackDots();
     pendingMidiNote = null;
@@ -1261,7 +1270,7 @@ keyboardChannel.subscribe('midi', message => {
             data.note >= firstNote &&
             data.note <= lastNote
         ) prependKeyMessage(formatKeyboardNote(data.note));
-        selectNote(data.note, data.source);
+        selectNote(data.note, data.source, data.source === 'sender2' ? data.group : undefined);
     }
     if (data?.type === 'noteoff') {
         releaseNote(data.note, data.source);
