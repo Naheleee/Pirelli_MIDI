@@ -62,7 +62,10 @@
   <script>
     const square = document.getElementById('square');
     const wrapper = document.getElementById('wrapper');
-    const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
+    const ablyClient = new Ably.Realtime({
+      key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
+      clientId: `sender2-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    });
     const midiChannel = ablyClient.channels.get('keyboard');
     // Adjust letter spacing and transition behavior here.
     const CONFIG = {
@@ -473,16 +476,19 @@
       let keyboardPresenceActive = false;
 
       async function setKeyboardPresence(isConnected) {
-        if (keyboardPresenceActive === isConnected) return;
-        keyboardPresenceActive = isConnected;
         try {
-          if (isConnected) {
-            await midiChannel.presence.enter({ instrument: 'keyboard' });
+          const presenceData = {
+            role: 'sender2',
+            instrument: isConnected ? 'keyboard' : null,
+            midiConnected: isConnected
+          };
+          if (keyboardPresenceActive) {
+            await midiChannel.presence.update(presenceData);
           } else {
-            await midiChannel.presence.leave();
+            await midiChannel.presence.enter(presenceData);
+            keyboardPresenceActive = true;
           }
         } catch (error) {
-          keyboardPresenceActive = !isConnected;
           console.error('Failed to update keyboard MIDI presence:', error);
         }
       }
@@ -519,10 +525,11 @@
 
       async function initMIDI() {
         try {
+          await setKeyboardPresence(false);
           await WebMidi.enable();
           activeMidiInput = findMidiInput();
           if (activeMidiInput) connectMidiInput(activeMidiInput);
-          void setKeyboardPresence(Boolean(activeMidiInput));
+          await setKeyboardPresence(Boolean(activeMidiInput));
 
           WebMidi.addListener('connected', event => {
             connectMidiInput(event.port);

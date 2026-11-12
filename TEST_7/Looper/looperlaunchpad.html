@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- Tone.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
     <script src="../Javascript/local-realtime.js"></script>
     <style>
         body {
@@ -136,7 +137,7 @@
             <p id="midi-status" class="text-xs text-slate-500 sm:col-span-2" role="status" aria-live="polite">Launchpad not connected.</p>
             <p id="looper-link-status" class="text-xs text-slate-500 sm:col-span-2" role="status">Waiting for sender1…</p>
             <p id="looper-sync-status" class="text-xs text-slate-500 sm:col-span-2" role="status" aria-live="polite">Connecting to other looper pages…</p>
-            <p id="keyboard-link-status" class="text-xs text-slate-500 sm:col-span-2" role="status" aria-live="polite">Waiting for sender2 keyboard input. MIDI 36 starts PAD 1; MIDI 65 deactivates it after its current loop finishes.</p>
+            <p id="keyboard-link-status" class="text-xs text-slate-500 sm:col-span-2" role="status" aria-live="polite">Connecting to sender2 via Ably. MIDI 36 starts PAD 1; MIDI 65 deactivates it after its current loop finishes.</p>
             <p id="audio-error" class="hidden text-sm text-red-400 sm:col-span-2" role="status"></p>
         </div>
 
@@ -500,8 +501,8 @@
             const data = message.data;
             if (data?.type !== 'noteon' || !Number.isInteger(data.note)) return;
 
-            const status = document.getElementById('keyboard-link-status');
-            status.textContent = 'Receiving sender2 keyboard input.';
+            keyboardInputReceived = true;
+            updateKeyboardLinkStatus();
             if (data.note === 36) {
                 void startPadImmediately(0).catch(error => {
                     const errorStatus = document.getElementById('audio-error');
@@ -1122,11 +1123,73 @@
         const localRealtime = new LocalRealtime({
             clientId: `looper-${Date.now()}-${Math.random().toString(36).slice(2)}`
         });
+        const keyboardAblyClient = new Ably.Realtime({
+            key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
+            clientId: `looper-keyboard-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        });
         const receiverAudioChannel = localRealtime.channels.get('receiver-audio');
-        const keyboardChannel = localRealtime.channels.get('keyboard');
+        const keyboardChannel = keyboardAblyClient.channels.get('keyboard');
         looperSyncChannel = localRealtime.channels.get('looper-pad-sync');
-        document.getElementById('looper-sync-status').textContent =
-            'Local communication active.';
+        document.getElementById('looper-sync-status').textContent = 'Local communication active.';
+        const keyboardLinkStatus = document.getElementById('keyboard-link-status');
+        const sender2Members = new Set();
+        const queuedSender2PresenceEvents = [];
+        let sender2PresenceLoaded = false;
+        let keyboardInputReceived = false;
+
+        function updateKeyboardLinkStatus() {
+            if (keyboardAblyClient.connection.state !== 'connected') {
+                keyboardLinkStatus.textContent =
+                    `Ably ${keyboardAblyClient.connection.state}; waiting for sender2.`;
+            } else if (keyboardInputReceived) {
+                keyboardLinkStatus.textContent = 'Receiving sender2 keyboard input via Ably.';
+            } else if (sender2Members.size > 0) {
+                keyboardLinkStatus.textContent = 'sender2 connected via Ably; waiting for keyboard input.';
+            } else {
+                keyboardLinkStatus.textContent = 'Connected to Ably; waiting for sender2.';
+            }
+        }
+
+        function applySender2PresenceEvent(action, member) {
+            const memberId = `${member.connectionId}:${member.clientId}`;
+            if (action === 'leave') {
+                sender2Members.delete(memberId);
+            } else if (member.data?.role === 'sender2') {
+                sender2Members.add(memberId);
+            } else {
+                return;
+            }
+            if (sender2Members.size === 0) keyboardInputReceived = false;
+            updateKeyboardLinkStatus();
+        }
+
+        for (const action of ['enter', 'update', 'leave']) {
+            keyboardChannel.presence.subscribe(action, member => {
+                if (!sender2PresenceLoaded) {
+                    queuedSender2PresenceEvents.push([action, member]);
+                } else {
+                    applySender2PresenceEvent(action, member);
+                }
+            });
+        }
+        keyboardAblyClient.connection.on('connected', updateKeyboardLinkStatus);
+        keyboardAblyClient.connection.on('disconnected', updateKeyboardLinkStatus);
+        keyboardChannel.presence.get().then(members => {
+            members.forEach(member => {
+                if (member.data?.role === 'sender2') {
+                    sender2Members.add(`${member.connectionId}:${member.clientId}`);
+                }
+            });
+            sender2PresenceLoaded = true;
+            queuedSender2PresenceEvents.forEach(([action, member]) => {
+                applySender2PresenceEvent(action, member);
+            });
+            queuedSender2PresenceEvents.length = 0;
+            updateKeyboardLinkStatus();
+        }).catch(error => {
+            keyboardLinkStatus.textContent = `Could not check sender2 presence: ${error.message}`;
+            console.error('Could not read sender2 presence from Ably:', error);
+        });
         looperSyncChannel.subscribe('pad-action', message => {
             void handleRemotePadAction(message.data).catch(error => {
                 document.getElementById('looper-sync-status').textContent =

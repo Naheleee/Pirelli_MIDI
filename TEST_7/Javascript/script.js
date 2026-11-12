@@ -5,7 +5,11 @@ const localRealtime = new LocalRealtime({
 const letterCycleChannel = localRealtime.channels.get('letter-cycle');
 const letterCyclePresence = letterCycleChannel.presence;
 const handTrackingChannel = localRealtime.channels.get('handtracking-vista2');
-const keyboardChannel = localRealtime.channels.get('keyboard');
+const keyboardAblyClient = new Ably.Realtime({
+    key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
+    clientId: receiverClientId
+});
+const keyboardChannel = keyboardAblyClient.channels.get('keyboard');
 const launchpadChannel = localRealtime.channels.get('launchpad');
 const receiverAudioChannel = localRealtime.channels.get('receiver-audio');
 let lastHandTrackingPublish = 0;
