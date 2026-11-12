@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#11130f">
+  <title>Loop Sound Test</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #11130f;
+      color: #f0f1e9;
+      font-synthesis: none;
+      text-rendering: optimizeLegibility;
+      --panel: #191c17;
+      --panel-soft: #20231d;
+      --line: #30342b;
+      --muted: #92978b;
+      --lime: #d7f56b;
+      --lime-dark: #29320d;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      background:
+        radial-gradient(ellipse at 50% -20%, #282d1e 0, transparent 56%),
+        #11130f;
+    }
+
+    button { font: inherit; }
+
+    .app {
+      width: min(1120px, 100%);
+      margin: 0 auto;
+      padding: 38px 28px 48px;
+    }
+
+    .topline, .brand, .transport, .section-heading, .inspector-heading,
+    .sound-row, .tempo, .legend, .footer-note {
+      display: flex;
+      align-items: center;
+    }
+
+    .topline { justify-content: space-between; gap: 20px; }
+    .brand { gap: 13px; }
+
+    .brand-mark {
+      display: grid;
+      width: 42px;
+      height: 42px;
+      place-items: center;
+      border: 1px solid #48512d;
+      border-radius: 12px;
+      color: var(--lime);
+      background: #20251a;
+      font-size: 19px;
+    }
+
+    .eyebrow, .small-label {
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+    }
+
+    h1 { margin: 3px 0 0; font-size: 19px; letter-spacing: -.035em; }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 11px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      color: #c1c5ba;
+      font-size: 11px;
+    }
+
+    .live-dot { width: 7px; height: 7px; border-radius: 50%; background: #72786a; }
+    .live-badge.playing .live-dot { background: var(--lime); box-shadow: 0 0 12px #d7f56b99; }
+
+    .intro { margin: 35px 0 23px; }
+    .intro h2 { margin: 0; font-size: clamp(24px, 4vw, 34px); letter-spacing: -.05em; }
+    .intro p { margin: 9px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+    .transport {
+      min-height: 75px;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 16px;
+      padding: 14px 17px;
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: #191c17e8;
+    }
+
+    .transport-left, .transport-right { display: flex; align-items: center; gap: 13px; }
+    .play-button {
+      display: inline-flex;
+      min-width: 112px;
+      height: 43px;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      border: 0;
+      border-radius: 10px;
+      color: #171a11;
+      background: var(--lime);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 800;
+      transition: transform .15s, background .15s;
+    }
+    .play-button:hover { transform: translateY(-1px); background: #e4ff8a; }
+    .play-button:focus-visible, .utility-button:focus-visible, .pad:focus-visible, .upload-button:focus-visible {
+      outline: 2px solid #fff;
+      outline-offset: 3px;
+    }
+
+    .tempo {
+      min-height: 43px;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 3px;
+      padding-left: 16px;
+      border-left: 1px solid var(--line);
+    }
+    .tempo strong { font-size: 17px; letter-spacing: -.03em; }
+    .tempo span { color: var(--muted); font-size: 10px; }
+
+    .utility-button {
+      height: 38px;
+      padding: 0 12px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      color: #c1c5ba;
+      background: transparent;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 650;
+    }
+    .utility-button:hover { border-color: #60664f; color: #fff; }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 248px;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .matrix-panel, .inspector {
+      border: 1px solid var(--line);
+      border-radius: 15px;
+      background: var(--panel);
+    }
+    .matrix-panel { min-width: 0; padding: 17px; }
+
+    .section-heading { justify-content: space-between; gap: 12px; margin-bottom: 17px; }
+    .section-heading h3, .inspector-heading h3 { margin: 0; font-size: 13px; }
+    .section-heading p { margin: 4px 0 0; color: var(--muted); font-size: 10px; }
+    .step-count { color: var(--muted); font-size: 10px; white-space: nowrap; }
+
+    .matrix-scroll { overflow-x: auto; padding: 2px 2px 7px; }
+    .matrix {
+      display: grid;
+      min-width: 500px;
+      grid-template-columns: 31px repeat(8, minmax(0, 1fr));
+      gap: 7px;
+      align-items: center;
+    }
+    .matrix-corner { width: 31px; }
+    .step-number {
+      color: #777d70;
+      font-size: 9px;
+      text-align: center;
+    }
+    .step-number.bar-start { color: var(--lime); }
+    .row-number {
+      color: #7f8578;
+      font-size: 9px;
+      font-variant-numeric: tabular-nums;
+      text-align: center;
+    }
+    .pad {
+      position: relative;
+      display: flex;
+      aspect-ratio: 1;
+      min-width: 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      overflow: hidden;
+      padding: 4px;
+      border: 1px solid #35392f;
+      border-radius: 9px;
+      color: #8d9386;
+      background: #242720;
+      cursor: pointer;
+      transition: background .12s, border-color .12s, color .12s, transform .12s;
+    }
+    .pad:hover { border-color: #747d56; transform: translateY(-1px); }
+    .pad.selected { border-color: #eef4cb; box-shadow: 0 0 0 1px #eef4cb44; }
+    .pad.active {
+      border-color: #b6d84f;
+      color: #e5f6b3;
+      background: linear-gradient(145deg, #485a1d, #303d16);
+    }
+    .pad.current-column:not(.active) { border-color: #929e69; background: #303629; }
+    .pad.active.current-column { border-color: #f0ffb3; box-shadow: 0 0 13px #d7f56b44; }
+    .pad-index { font-size: 10px; font-weight: 750; line-height: 1; }
+    .pad-sound {
+      width: 100%;
+      overflow: hidden;
+      color: #abb58d;
+      font-size: 8px;
+      line-height: 1;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .legend { gap: 14px; margin-top: 15px; color: var(--muted); font-size: 10px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-swatch { width: 9px; height: 9px; border: 1px solid #596142; border-radius: 3px; background: #3b4a1b; }
+    .legend-swatch.beat { border-color: #929e69; background: #303629; }
+
+    .inspector { display: flex; flex-direction: column; padding: 18px; }
+    .inspector-heading { justify-content: space-between; gap: 10px; }
+    .slot-tag { color: var(--lime); font-size: 10px; font-weight: 750; letter-spacing: .08em; }
+    .selected-pad {
+      display: grid;
+      width: 68px;
+      height: 68px;
+      place-items: center;
+      margin: 23px 0 16px;
+      border: 1px solid #a6c747;
+      border-radius: 13px;
+      color: var(--lime);
+      background: var(--lime-dark);
+      font-size: 22px;
+      font-weight: 750;
+    }
+    .sound-name {
+      min-height: 34px;
+      overflow-wrap: anywhere;
+      color: #eff0e8;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .sound-empty { color: var(--muted); }
+    .upload-button {
+      display: flex;
+      min-height: 41px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 17px;
+      border: 1px solid #50583b;
+      border-radius: 9px;
+      color: var(--lime);
+      background: #252b1b;
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 750;
+    }
+    .upload-button:hover { background: #303820; }
+    .remove-button {
+      align-self: flex-start;
+      margin-top: 10px;
+      padding: 4px 0;
+      border: 0;
+      color: #a0a596;
+      background: none;
+      cursor: pointer;
+      font-size: 10px;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .remove-button:disabled { visibility: hidden; }
+    .inspector-divider { height: 1px; margin: 21px 0 16px; border: 0; background: var(--line); }
+    .how-to { margin: 8px 0 0; padding-left: 16px; color: var(--muted); font-size: 10px; line-height: 1.8; }
+    .how-to strong { color: #d5d9cd; font-weight: 600; }
+    .footer-note { gap: 7px; margin-top: auto; padding-top: 24px; color: #73796d; font-size: 9px; line-height: 1.5; }
+    .footer-note span { color: var(--lime); }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      clip-path: inset(50%);
+    }
+
+    @media (max-width: 760px) {
+      .app { padding: 25px 16px 35px; }
+      .workspace { grid-template-columns: 1fr; }
+      .inspector { min-height: 250px; }
+      .selected-pad { position: absolute; right: 36px; margin-top: 0; }
+      .transport { align-items: flex-start; }
+      .transport-right { flex-wrap: wrap; justify-content: flex-end; }
+    }
+
+    @media (max-width: 460px) {
+      .live-badge { font-size: 0; }
+      .live-dot { width: 8px; height: 8px; }
+      .transport { flex-direction: column; align-items: stretch; }
+      .transport-left, .transport-right { justify-content: space-between; }
+      .utility-button { flex: 1; }
+      .matrix-panel { padding: 12px; }
+      .matrix { gap: 5px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topline">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">▦</div>
+        <div>
+          <div class="eyebrow">Creative tools / 01</div>
+          <h1>Loop Sound Test</h1>
+        </div>
+      </div>
+      <div class="live-badge" id="liveBadge"><span class="live-dot"></span><span id="playStatus">STOPPED</span></div>
+    </header>
+
+    <section class="intro" aria-labelledby="pageTitle">
+      <h2 id="pageTitle">Build a loop, one pad at a time.</h2>
+      <p>Load a sound onto any pad, switch it on, and let the whole matrix play in time.</p>
+    </section>
+
+    <section class="transport" aria-label="Sequencer controls">
+      <div class="transport-left">
+        <button class="play-button" id="playButton" type="button" aria-pressed="false">
+          <span id="playIcon" aria-hidden="true">▶</span>
+          <span id="playLabel">Play loop</span>
+        </button>
+        <div class="tempo" aria-label="Tempo, 70 beats per minute">
+          <strong>70 <span style="font-size:11px; color:var(--muted); font-weight:650">BPM</span></strong>
+          <span>ONE BEAT PER STEP</span>
+        </div>
+      </div>
+      <div class="transport-right">
+        <button class="utility-button" id="clearButton" type="button" title="Turn off all active pads">Clear pattern</button>
+        <button class="utility-button" id="removeSoundsButton" type="button" title="Remove every loaded sound">Remove sounds</button>
+      </div>
+    </section>
+
+    <div class="workspace">
+      <section class="matrix-panel" aria-labelledby="matrixTitle">
+        <div class="section-heading">
+          <div>
+            <h3 id="matrixTitle">Sound matrix</h3>
+            <p>Click a pad to add it to the loop</p>
+          </div>
+          <span class="step-count">8 STEPS · 8 PADS</span>
+        </div>
+        <div class="matrix-scroll">
+          <div class="matrix" id="matrix" role="group" aria-label="Eight by eight sound sequencer"></div>
+        </div>
+        <div class="legend" aria-label="Matrix legend">
+          <span class="legend-item"><span class="legend-swatch"></span>Sound on</span>
+          <span class="legend-item"><span class="legend-swatch beat"></span>Current beat</span>
+        </div>
+      </section>
+
+      <aside class="inspector" aria-label="Selected pad sound">
+        <div class="inspector-heading">
+          <h3>Pad sound</h3>
+          <span class="slot-tag" id="slotTag">A1</span>
+        </div>
+        <div class="selected-pad" id="selectedPad" aria-hidden="true">01</div>
+        <div class="small-label">LOADED SOUND</div>
+        <div class="sound-name sound-empty" id="soundName" aria-live="polite">No sound loaded</div>
+        <label class="upload-button" for="soundInput">
+          <span aria-hidden="true">＋</span>
+          <span id="uploadLabel">Choose audio file</span>
+        </label>
+        <input class="sr-only" id="soundInput" type="file" accept="audio/*">
+        <button class="remove-button" id="removeSoundButton" type="button" disabled>Remove sound from this pad</button>
+        <hr class="inspector-divider">
+        <div class="small-label">HOW TO PLAY</div>
+        <ol class="how-to">
+          <li><strong>Select a pad</strong> in the matrix.</li>
+          <li><strong>Choose a sound</strong> for that pad.</li>
+          <li><strong>Switch pads on</strong> and press play.</li>
+        </ol>
+        <div class="footer-note"><span>●</span> Samples fit an 8-beat loop and repeat on their step.</div>
+      </aside>
+    </div>
+    <div class="sr-only" id="announcement" aria-live="polite"></div>
+  </main>
+
+  <script>
+    (() => {
+      const SIZE = 8;
+      const BPM = 70;
+      const STEP_DURATION = 60 / BPM;
+      const LOOP_DURATION = STEP_DURATION * SIZE;
+      const LOOKAHEAD = 0.12;
+      const SCHEDULER_INTERVAL = 25;
+      const pads = Array.from({ length: SIZE * SIZE }, () => ({
+        active: false,
+        buffer: null,
+        soundName: ""
+      }));
+
+      const matrix = document.getElementById("matrix");
+      const soundInput = document.getElementById("soundInput");
+      const playButton = document.getElementById("playButton");
+      const playIcon = document.getElementById("playIcon");
+      const playLabel = document.getElementById("playLabel");
+      const playStatus = document.getElementById("playStatus");
+      const liveBadge = document.getElementById("liveBadge");
+      const announcement = document.getElementById("announcement");
+      let selectedIndex = 0;
+      let audioContext = null;
+      let schedulerId = null;
+      let nextStepTime = 0;
+      let nextStep = 0;
+      let currentColumn = -1;
+      let playing = false;
+
+      function slotName(index) {
+        return `${String.fromCharCode(65 + Math.floor(index / SIZE))}${(index % SIZE) + 1}`;
+      }
+
+      function buildMatrix() {
+        const corner = document.createElement("span");
+        corner.className = "matrix-corner";
+        corner.setAttribute("aria-hidden", "true");
+        matrix.append(corner);
+
+        for (let step = 0; step < SIZE; step += 1) {
+          const label = document.createElement("span");
+          label.className = `step-number${step === 0 || step === 4 ? " bar-start" : ""}`;
+          label.textContent = String(step + 1).padStart(2, "0");
+          label.setAttribute("aria-label", `Step ${step + 1}`);
+          matrix.append(label);
+        }
+
+        for (let row = 0; row < SIZE; row += 1) {
+          const rowLabel = document.createElement("span");
+          rowLabel.className = "row-number";
+          rowLabel.textContent = String.fromCharCode(65 + row);
+          rowLabel.setAttribute("aria-label", `Pad row ${String.fromCharCode(65 + row)}`);
+          matrix.append(rowLabel);
+
+          for (let column = 0; column < SIZE; column += 1) {
+            const index = row * SIZE + column;
+            const pad = document.createElement("button");
+            pad.type = "button";
+            pad.className = "pad";
+            pad.dataset.index = String(index);
+            pad.setAttribute("aria-pressed", "false");
+            pad.setAttribute("aria-label", `Pad ${slotName(index)}, step ${column + 1}, no sound loaded, off`);
+            pad.innerHTML = `<span class="pad-index">${String(index + 1).padStart(2, "0")}</span><span class="pad-sound"></span>`;
+            pad.addEventListener("click", () => {
+              selectedIndex = index;
+              pads[index].active = !pads[index].active;
+              render();
+            });
+            matrix.append(pad);
+          }
+        }
+      }
+
+      function render() {
+        matrix.querySelectorAll(".pad").forEach((pad) => {
+          const index = Number(pad.dataset.index);
+          const data = pads[index];
+          const column = index % SIZE;
+          pad.classList.toggle("active", data.active);
+          pad.classList.toggle("selected", index === selectedIndex);
+          pad.classList.toggle("current-column", playing && column === currentColumn);
+          pad.setAttribute("aria-pressed", String(data.active));
+          pad.setAttribute(
+            "aria-label",
+            `Pad ${slotName(index)}, step ${column + 1}, ${data.soundName || "no sound loaded"}, ${data.active ? "on" : "off"}`
+          );
+          pad.querySelector(".pad-sound").textContent = data.soundName;
+          pad.title = `${slotName(index)} · Step ${column + 1}${data.soundName ? ` · ${data.soundName}` : " · No sound loaded"}`;
+        });
+
+        const selected = pads[selectedIndex];
+        document.getElementById("slotTag").textContent = slotName(selectedIndex);
+        document.getElementById("selectedPad").textContent = String(selectedIndex + 1).padStart(2, "0");
+        const soundName = document.getElementById("soundName");
+        soundName.textContent = selected.soundName || "No sound loaded";
+        soundName.classList.toggle("sound-empty", !selected.soundName);
+        document.getElementById("uploadLabel").textContent = selected.soundName ? "Replace audio file" : "Choose audio file";
+        document.getElementById("removeSoundButton").disabled = !selected.buffer;
+      }
+
+      function setPlaying(value) {
+        playing = value;
+        playButton.setAttribute("aria-pressed", String(value));
+        playIcon.textContent = value ? "Ⅱ" : "▶";
+        playLabel.textContent = value ? "Stop loop" : "Play loop";
+        playStatus.textContent = value ? "PLAYING" : "STOPPED";
+        liveBadge.classList.toggle("playing", value);
+        if (!value) {
+          window.clearInterval(schedulerId);
+          schedulerId = null;
+          currentColumn = -1;
+        }
+        render();
+      }
+
+      function scheduleStep(time) {
+        const column = nextStep % SIZE;
+        currentColumn = column;
+        for (let row = 0; row < SIZE; row += 1) {
+          const pad = pads[row * SIZE + column];
+          if (!pad.active || !pad.buffer) continue;
+
+          const source = audioContext.createBufferSource();
+          source.buffer = pad.buffer;
+          source.playbackRate.setValueAtTime(pad.buffer.duration / LOOP_DURATION, time);
+          source.connect(audioContext.destination);
+          source.start(time);
+          source.stop(time + LOOP_DURATION);
+        }
+
+        announcement.textContent = `Step ${column + 1} of ${SIZE}`;
+        nextStep = (nextStep + 1) % SIZE;
+        render();
+      }
+
+      function runScheduler() {
+        while (nextStepTime < audioContext.currentTime + LOOKAHEAD) {
+          scheduleStep(nextStepTime);
+          nextStepTime += STEP_DURATION;
+        }
+      }
+
+      async function startLoop() {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) {
+          announcement.textContent = "Audio playback is not supported in this browser.";
+          return;
+        }
+
+        audioContext ??= new AudioContextClass();
+        await audioContext.resume();
+        nextStep = 0;
+        nextStepTime = audioContext.currentTime + 0.05;
+        setPlaying(true);
+        runScheduler();
+        schedulerId = window.setInterval(runScheduler, SCHEDULER_INTERVAL);
+      }
+
+      playButton.addEventListener("click", async () => {
+        if (playing) {
+          setPlaying(false);
+          return;
+        }
+        playButton.disabled = true;
+        try {
+          await startLoop();
+        } catch (error) {
+          announcement.textContent = `Could not start audio: ${error.message}`;
+        } finally {
+          playButton.disabled = false;
+        }
+      });
+
+      soundInput.addEventListener("change", async () => {
+        const file = soundInput.files && soundInput.files[0];
+        if (!file) return;
+        const target = selectedIndex;
+        document.getElementById("uploadLabel").textContent = "Loading sound…";
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) throw new Error("Audio playback is not supported in this browser.");
+          audioContext ??= new AudioContextClass();
+          const buffer = await audioContext.decodeAudioData(await file.arrayBuffer());
+          pads[target].buffer = buffer;
+          pads[target].soundName = file.name;
+          selectedIndex = target;
+          announcement.textContent = `Loaded ${file.name} onto pad ${slotName(target)}.`;
+        } catch (error) {
+          announcement.textContent = `Could not load audio file: ${error.message}`;
+        } finally {
+          soundInput.value = "";
+          render();
+        }
+      });
+
+      document.getElementById("clearButton").addEventListener("click", () => {
+        pads.forEach((pad) => { pad.active = false; });
+        render();
+        announcement.textContent = "All pads turned off. Loaded sounds are kept.";
+      });
+
+      document.getElementById("removeSoundButton").addEventListener("click", () => {
+        pads[selectedIndex].buffer = null;
+        pads[selectedIndex].soundName = "";
+        render();
+        announcement.textContent = `Sound removed from pad ${slotName(selectedIndex)}.`;
+      });
+
+      document.getElementById("removeSoundsButton").addEventListener("click", () => {
+        pads.forEach((pad) => {
+          pad.buffer = null;
+          pad.soundName = "";
+        });
+        render();
+        announcement.textContent = "All loaded sounds removed.";
+      });
+
+      buildMatrix();
+      render();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PirelliVar Studio - Variable Font Wave</title>
+  <script src="https://cdn.jsdelivr.net/npm/webmidi@3.1.16/dist/iife/webmidi.iife.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+  <style>
+    @font-face {
+      font-family: PirelliVar;
+      src: url('Fonts/PirelliVar.woff2') format('woff2-variations');
+      font-stretch: 100% 500%;
+    }
+    @font-face {
+      font-family: PirelliStencil;
+      src: url('Fonts/PirelliStencil.woff2') format('woff2');
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      height: 100vh;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background: #000;
+    }
+    #square {
+      width: 100%;
+      height: min(100vw, 100vh);
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+      background: #F46404;
+    }
+    #wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      color: #1A1A1A;
+      font-family: PirelliVar;
+      white-space: nowrap;
+    }
+    #wrapper span {
+      display: inline-block;
+      flex: 0 0 auto;
+      margin: 0;
+      text-align: center;
+      padding: 10px;
+    }
+  </style>
+</head>
+<body>
+  <main id="square">
+    <div id="wrapper"></div>
+  </main>
+  <script>
+    const square = document.getElementById('square');
+    const wrapper = document.getElementById('wrapper');
+    const ablyClient = new Ably.Realtime("xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0");
+    const midiChannel = ablyClient.channels.get('keyboard');
+    // Adjust letter spacing and transition behavior here.
+    const CONFIG = {
+      letterCount: 9,
+      letterGap: -100,
+      minFontWidth: 100,
+      maxFontWidth: 500,
+      fontSizeSafetyScale: 0.75,
+      midiFirstNote: 36,
+      midiLastNote: 65,
+      transitionDurationMs: 1000,
+      animationVelocity: 1,
+      minAnimationVelocity: 0.1,
+      maxAnimationVelocity: 5,
+      transitionType: 'cubic',
+      elasticBounceStrength: 0.5
+    };
+    const count = CONFIG.letterCount;
+    let effectiveGap = CONFIG.letterGap;
+    const easingFunctions = {
+      linear: progress => progress,
+      cubic: progress =>
+        1 - (1 - progress) ** 3,
+      elastic: progress => {
+        if (progress === 0 || progress === 1) return progress;
+        return 2 ** (-10 * progress) *
+          Math.sin((progress * 10 - 0.75) * (2 * Math.PI / 3)) + 1;
+      },
+      softElastic: progress => {
+        if (progress === 0 || progress === 1) return progress;
+        const smoothProgress =
+          progress < 0.5
+            ? 4 * progress ** 3
+            : 1 - (-2 * progress + 2) ** 3 / 2;
+        const elasticProgress = progress < 0.5
+          ? -(
+              2 ** (20 * progress - 10) *
+              Math.sin((20 * progress - 11.125) * (2 * Math.PI / 4.5))
+            ) / 2
+          : (
+              2 ** (-20 * progress + 10) *
+              Math.sin((20 * progress - 11.125) * (2 * Math.PI / 4.5))
+            ) / 2 + 1;
+        return smoothProgress +
+          (elasticProgress - smoothProgress) *
+            CONFIG.elasticBounceStrength;
+      }
+    };
+    const spans = Array.from({ length: count }, () => {
+      const span = document.createElement('span');
+      span.textContent = 'A';
+      span.style.fontVariationSettings =
+        `'wdth' ${CONFIG.minFontWidth}`;
+      wrapper.appendChild(span);
+      return span;
+    });
+
+    function getWaveWidths(crest) {
+      return spans.map((_, index) => {
+        if (index === crest) return CONFIG.maxFontWidth;
+
+        const distanceToEdge = index < crest
+          ? crest
+          : count - 1 - crest;
+        const distanceFromCrest = Math.abs(index - crest);
+        const widthRange =
+          CONFIG.maxFontWidth - CONFIG.minFontWidth;
+
+        return CONFIG.maxFontWidth -
+          widthRange * distanceFromCrest / distanceToEdge;
+      });
+    }
+
+    function getFittedFontSize(widths, fontFamily) {
+      const size = square.clientWidth;
+      const height = square.clientHeight;
+      if (!size || !height) return 0;
+
+      const previousFontSize = wrapper.style.fontSize;
+      const previousFontFamily = wrapper.style.fontFamily;
+      const previousWidths = spans.map(
+        span => span.style.fontVariationSettings
+      );
+      wrapper.style.fontFamily = `"${fontFamily}"`;
+      spans.forEach((span, index) => {
+        span.style.fontVariationSettings = `'wdth' ${widths[index]}`;
+      });
+
+      let low = 1;
+      let high = height * 4;
+      for (let i = 0; i < 30; i++) {
+        const mid = (low + high) / 2;
+        wrapper.style.fontSize = `${mid}px`;
+        const lettersWidth = spans.reduce(
+          (total, span) => total + span.getBoundingClientRect().width,
+          0
+        ) + effectiveGap * (count - 1);
+        const lettersHeight = Math.max(
+          ...spans.map(span => span.getBoundingClientRect().height)
+        );
+        if (
+          lettersWidth <= size &&
+          lettersHeight <= height
+        ) {
+          low = mid;
+        } else {
+          high = mid;
+        }
+      }
+      wrapper.style.fontSize = previousFontSize;
+      wrapper.style.fontFamily = previousFontFamily;
+      spans.forEach((span, index) => {
+        span.style.fontVariationSettings = previousWidths[index];
+      });
+      return low * CONFIG.fontSizeSafetyScale;
+    }
+
+    function fitText() {
+      wrapper.style.width = '100%';
+      effectiveGap = CONFIG.letterGap;
+      wrapper.style.columnGap = '0px';
+      spans.forEach((span, index) => {
+        span.style.marginLeft =
+          index === 0 ? '0px' : `${effectiveGap}px`;
+        span.style.fontVariationSettings =
+          `'wdth' ${CONFIG.minFontWidth}`;
+      });
+      let fittedFontSize = Infinity;
+      for (const fontFamily of ['PirelliVar', 'PirelliStencil']) {
+        for (let center = 0; center < count; center++) {
+          fittedFontSize = Math.min(
+            fittedFontSize,
+            getFittedFontSize(
+              getWaveWidths(center),
+              fontFamily
+            )
+          );
+        }
+      }
+      wrapper.style.fontSize = `${fittedFontSize}px`;
+    }
+
+    let stencilActive = false;
+    let fontSwitchRequest = 0;
+
+    window.addEventListener('keydown', event => {
+      if (event.code !== 'Space' || event.repeat) return;
+      event.preventDefault();
+
+      stencilActive = !stencilActive;
+      const fontFamily = stencilActive
+        ? 'PirelliStencil'
+        : 'PirelliVar';
+      const request = ++fontSwitchRequest;
+
+      document.fonts.load(`16px "${fontFamily}"`)
+        .then(() => {
+          if (request !== fontSwitchRequest) return;
+          wrapper.style.fontFamily = `"${fontFamily}"`;
+          midiChannel.publish('midi', {
+            type: 'fontchange',
+            fontFamily
+          });
+        })
+        .catch(error => {
+          console.error(
+            `Failed to load ${fontFamily}:`,
+            error
+          );
+        });
+    });
+
+    Promise.all([
+      document.fonts.load('16px "PirelliVar"', 'A'),
+      document.fonts.load('16px "PirelliStencil"', 'A')
+    ]).then(() => {
+      fitText();
+      spans.forEach(span => {
+        span.style.fontVariationSettings =
+          `'wdth' ${CONFIG.minFontWidth}`;
+      });
+      window.dispatchEvent(new Event('staticlettersready'));
+    });
+
+    window.addEventListener('resize', () => {
+      fitText();
+      window.dispatchEvent(new Event('staticlettersready'));
+    });
+  </script>
+  <script>
+    (() => {
+      const firstMidiNote = CONFIG.midiFirstNote;
+      const lastMidiNote = CONFIG.midiLastNote;
+      const totalGroups = CONFIG.letterCount;
+      const whitePitchClasses = new Set([0, 2, 4, 5, 7, 9, 11]);
+      const groupLetters = Array.from(
+        document.querySelectorAll('#wrapper span')
+      );
+      let selectedGroup = null;
+      let lettersReady = false;
+      let midiInitialized = false;
+      let animationFrame = null;
+      let animationStart = 0;
+      let animationFrom = groupLetters.map(
+        () => CONFIG.minFontWidth
+      );
+      let animationTo = animationFrom.slice();
+      const easing = easingFunctions[CONFIG.transitionType];
+      if (!easing) {
+        throw new Error(
+          `Unknown transition type: ${CONFIG.transitionType}`
+        );
+      }
+
+      function getGroupIndex(midi) {
+        let whiteKeysBefore = 0;
+        for (let note = firstMidiNote; note < midi; note++) {
+          if (whitePitchClasses.has(note % 12)) whiteKeysBefore++;
+        }
+        return Math.floor(whiteKeysBefore / 2);
+      }
+
+      function showSelectedGroup() {
+        if (!lettersReady) return;
+        const targetWidths = selectedGroup === null
+          ? groupLetters.map(() => CONFIG.minFontWidth)
+          : getWaveWidths(selectedGroup);
+        animateTo(targetWidths);
+      }
+
+      function applyWidths(widths) {
+        groupLetters.forEach((span, index) => {
+          span.style.fontVariationSettings = `'wdth' ${
+            Math.max(
+              CONFIG.minFontWidth,
+              Math.min(CONFIG.maxFontWidth, widths[index])
+            )
+          }`;
+        });
+      }
+
+      function animateTo(targetWidths) {
+        if (animationFrame !== null) {
+          cancelAnimationFrame(animationFrame);
+        }
+        animationFrom = groupLetters.map(span => {
+          const match = getComputedStyle(span)
+            .fontVariationSettings.match(/[\d.]+/);
+          return match ? Number(match[0]) : CONFIG.minFontWidth;
+        });
+        animationTo = targetWidths;
+        animationStart = 0;
+        animationFrame = requestAnimationFrame(animateFrame);
+      }
+
+      function animateFrame(time) {
+        if (animationStart === 0) animationStart = time;
+        const velocity = Math.max(
+          CONFIG.minAnimationVelocity,
+          Math.min(
+            CONFIG.maxAnimationVelocity,
+            CONFIG.animationVelocity
+          )
+        );
+        const duration = Math.max(
+          1,
+          CONFIG.transitionDurationMs / velocity
+        );
+        const progress = Math.min(1, (time - animationStart) / duration);
+        const easedProgress = easing(progress);
+        const widths = animationFrom.map((start, index) =>
+          start + (animationTo[index] - start) * easedProgress
+        );
+        applyWidths(widths);
+
+        if (progress < 1) {
+          animationFrame = requestAnimationFrame(animateFrame);
+        } else {
+          animationFrame = null;
+          applyWidths(animationTo);
+        }
+      }
+
+      function pressMidiNote(midi) {
+        if (
+          !Number.isInteger(midi) ||
+          midi < firstMidiNote ||
+          midi > lastMidiNote
+        ){
+          return;
+        }
+        midiChannel.publish('midi', { type: 'noteon', note: midi })
+          .catch(error => {
+            console.error('Failed to send keyboard MIDI note-on:', error);
+          });
+        if (!lettersReady || !whitePitchClasses.has(midi % 12)) return;
+        selectedGroup = getGroupIndex(midi);
+        showSelectedGroup();
+      }
+
+      function releaseMidiNote(midi) {
+        if (
+          !Number.isInteger(midi) ||
+          midi < firstMidiNote ||
+          midi > lastMidiNote
+        ) return;
+        midiChannel.publish('midi', { type: 'noteoff', note: midi })
+          .catch(error => {
+            console.error('Failed to send keyboard MIDI note-off:', error);
+          });
+      }
+
+      const keyboardNotes = new Map([
+        ['KeyA', { note: 36, sound: 0 }],
+        ['KeyS', { note: 40, sound: 1 }],
+        ['KeyD', { note: 43, sound: 2 }],
+        ['KeyF', { note: 47, sound: 3 }],
+        ['KeyG', { note: 50, sound: 4 }],
+        ['KeyH', { note: 53, sound: 5 }],
+        ['KeyJ', { note: 57, sound: 6 }],
+        ['KeyK', { note: 60, sound: 7 }],
+        ['KeyL', { note: 64, sound: 8 }]
+      ]);
+      const pressedKeyboardKeys = new Set();
+      const keyboardSounds = Array.from({ length: 9 }, (_, index) => {
+        return new Tone.Player().toDestination();
+      });
+      const keyboardSoundsReady = keyboardSounds.map(async (sound, index) => {
+        try {
+          const sampleUrl = new URL(
+            `SFX/2 cat eyes/cateyes_${index + 1}.wav`,
+            document.baseURI
+          );
+          const response = await fetch(sampleUrl);
+          if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`);
+          }
+          sound.buffer = await Tone.context.decodeAudioData(
+            await response.arrayBuffer()
+          );
+          return true;
+        } catch (error) {
+          console.error(`Failed to load cateyes_${index + 1}.wav:`, error);
+          return false;
+        }
+      });
+      Tone.Transport.bpm.value = 70;
+      Tone.Transport.timeSignature = 4;
+      Tone.Transport.loop = true;
+      Tone.Transport.loopStart = 0;
+      Tone.Transport.loopEnd = '1m';
+      const beatsPerLoop = 4;
+      let transportBeatCount = 0;
+      let activeKeyboardSound = null;
+      let pendingSoundIndex = null;
+      let keyboardSoundRequest = 0;
+
+      Tone.Transport.scheduleRepeat(time => {
+        const beat = transportBeatCount % beatsPerLoop;
+        if (beat === 0 && pendingSoundIndex !== null) {
+          const sound = keyboardSounds[pendingSoundIndex];
+          pendingSoundIndex = null;
+          if (activeKeyboardSound) activeKeyboardSound.stop(time);
+          sound.start(time);
+          activeKeyboardSound = sound;
+        }
+        transportBeatCount++;
+      }, '4n');
+
+      function playKeyboardSound(index) {
+        const request = ++keyboardSoundRequest;
+        void (async () => {
+          await Tone.start();
+          if (Tone.Transport.state !== 'started') Tone.Transport.start();
+          const isLoaded = await keyboardSoundsReady[index];
+          if (request !== keyboardSoundRequest || !isLoaded) return;
+          pendingSoundIndex = index;
+        })().catch(error => {
+          console.error('Failed to start keyboard audio:', error);
+        });
+      }
+
+      window.addEventListener('keydown', event => {
+        const key = keyboardNotes.get(event.code);
+        if (key === undefined || pressedKeyboardKeys.has(event.code)) return;
+        event.preventDefault();
+        pressedKeyboardKeys.add(event.code);
+        playKeyboardSound(key.sound);
+        pressMidiNote(key.note);
+      });
+
+      function releaseKeyboardKey(code) {
+        const key = keyboardNotes.get(code);
+        if (key === undefined || !pressedKeyboardKeys.delete(code)) return;
+        releaseMidiNote(key.note);
+      }
+
+      window.addEventListener('keyup', event => {
+        releaseKeyboardKey(event.code);
+      });
+
+      window.addEventListener('blur', () => {
+        pressedKeyboardKeys.forEach(releaseKeyboardKey);
+      });
+
+      const connectedMidiInputs = new WeakSet();
+      let activeMidiInput = null;
+      let keyboardPresenceActive = false;
+
+      async function setKeyboardPresence(isConnected) {
+        if (keyboardPresenceActive === isConnected) return;
+        keyboardPresenceActive = isConnected;
+        try {
+          if (isConnected) {
+            await midiChannel.presence.enter({ instrument: 'keyboard' });
+          } else {
+            await midiChannel.presence.leave();
+          }
+        } catch (error) {
+          keyboardPresenceActive = !isConnected;
+          console.error('Failed to update keyboard MIDI presence:', error);
+        }
+      }
+
+      function connectMidiInput(input) {
+        if (!input || connectedMidiInputs.has(input)) return;
+        connectedMidiInputs.add(input);
+
+        input.addListener('noteon', event => {
+          if (event.velocity === 0) {
+            releaseMidiNote(event.note.number);
+          } else {
+            pressMidiNote(event.note.number);
+          }
+        });
+        input.addListener('noteoff', event => {
+          releaseMidiNote(event.note.number);
+        });
+      }
+
+      function findMidiInput() {
+        return WebMidi.inputs.find(device =>
+          /launchkey|novation/i.test(device.name)
+        ) ||
+          WebMidi.inputs.find(device =>
+            device.name.toLowerCase().includes('bk-3')
+          ) ||
+          WebMidi.inputs.find(device =>
+            device.name.toLowerCase().includes('roland')
+          ) ||
+          WebMidi.inputs[0] ||
+          null;
+      }
+
+      async function initMIDI() {
+        try {
+          await WebMidi.enable();
+          activeMidiInput = findMidiInput();
+          if (activeMidiInput) connectMidiInput(activeMidiInput);
+          void setKeyboardPresence(Boolean(activeMidiInput));
+
+          WebMidi.addListener('connected', event => {
+            connectMidiInput(event.port);
+            if (!activeMidiInput) {
+              activeMidiInput = findMidiInput();
+              void setKeyboardPresence(Boolean(activeMidiInput));
+            }
+          });
+          WebMidi.addListener('disconnected', event => {
+            if (event.port !== activeMidiInput) return;
+            activeMidiInput = findMidiInput();
+            if (activeMidiInput) connectMidiInput(activeMidiInput);
+            void setKeyboardPresence(Boolean(activeMidiInput));
+          });
+        } catch (error) {
+          console.error('Errore WebMIDI:', error);
+        }
+      }
+
+      window.addEventListener('staticlettersready', () => {
+        lettersReady = true;
+        if (!midiInitialized) {
+          selectedGroup = totalGroups - 1;
+          applyWidths(getWaveWidths(selectedGroup));
+          midiInitialized = true;
+          void initMIDI();
+          return;
+        }
+        showSelectedGroup();
+      });
+    })();
+  </script>
+</body>
+</html>

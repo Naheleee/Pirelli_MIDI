@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pirelli - Letter Canvas</title>
+    <link rel="stylesheet" href="../CSS/style.css">
+    <style>
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+            background: #1A1A1A;
+        }
+
+        .container {
+            width: 100%;
+            height: 100%;
+            grid-template-rows: minmax(0, 1fr);
+        }
+
+        .lettere {
+            width: 100%;
+            height: 100%;
+            padding: 0 10px;
+            
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: space-between;
+       
+        }
+
+        .lettere-riga {
+            display: flex;
+            width: 100%;
+            height: 25%;
+            flex: 0 0 25%;
+            align-items: center;
+            justify-content: space-between;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .lettere-riga:nth-child(odd):not(:last-child),
+        
+        .letterelinea3 {
+            transform: scaleX(-1);
+        }
+
+        .lettere.is-animating .letterelinea1,
+        .lettere.is-animating .letterelinea2,
+        .lettere.is-animating .letterelinea3 {
+            visibility: hidden;
+        }
+
+        .lettere.is-animating .letterelinea1.is-visible,
+        .lettere.is-animating .letterelinea2.is-visible,
+        .lettere.is-animating .letterelinea3.is-visible {
+            visibility: visible;
+        }
+
+        .letterelinea4 {
+            transform: scaleX(1);
+        }
+
+        .lettera-singola {
+            font-size: 270px;
+            padding: 0;
+        
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="lettere is-animating" aria-label="Animated letters"></div>
+    </div>
+    <script src="../Javascript/vista3.js"></script>
+</body>
+
+</html>

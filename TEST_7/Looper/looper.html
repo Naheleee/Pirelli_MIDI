@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Looper</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: { cardDark: '#12161c' }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Tone.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdn.ably.com/lib/ably.min-2.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0b0d10;
+            touch-action: manipulation;
+        }
+        .font-orbitron {
+            font-family: 'Inter', sans-serif;
+        }
+        .pad-card {
+            --pad-accent: #22d3ee;
+            background: #12161c;
+            border: 1px solid #252b34;
+            border-radius: 0.75rem;
+            padding: 1rem;
+        }
+        .pad-card[data-color="fuchsia"] { --pad-accent: #e879f9; }
+        .pad-card[data-color="yellow"] { --pad-accent: #facc15; }
+        .pad-card[data-color="emerald"] { --pad-accent: #34d399; }
+        .pad-button {
+            width: 100%;
+            height: 9rem;
+            border: 1px solid #343b46;
+            border-radius: 0.625rem;
+            background: #0b0d10;
+            color: #cbd5e1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            transition: background-color 150ms, border-color 150ms;
+        }
+        .pad-button[data-state="playing"] {
+            border-color: var(--pad-accent);
+            background: #151d22;
+            color: var(--pad-accent);
+        }
+        .pad-button[data-state="pending_start"],
+        .pad-button[data-state="pending_stop"] {
+            border-color: #eab308;
+            color: #fde047;
+        }
+        .pad-status {
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            background: #202630;
+            color: #aab4c0;
+            font-size: 0.7rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col justify-between select-none">
+
+    <!-- Header Principale -->
+    <header class="border-b border-slate-800 px-4 py-4">
+        <div class="max-w-5xl mx-auto flex justify-between items-center gap-4">
+            <h1 class="text-lg font-semibold tracking-wide text-white">LOOPER</h1>
+            <div class="flex items-center gap-2">
+                <button id="btn-master-start" class="px-4 py-2 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-sm transition-colors">
+                    <i class="fa-solid fa-play mr-1"></i> Start
+                </button>
+                <button id="btn-stop-all" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm transition-colors">
+                    Stop all
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="max-w-5xl mx-auto w-full p-4 md:p-6 flex-1 flex flex-col justify-center gap-4">
+
+        <div class="bg-cardDark border border-slate-800 rounded-xl p-4 md:p-5 grid grid-cols-1 sm:grid-cols-2 gap-5 items-center">
+            
+            <!-- BPM Control & Bar Length Selection -->
+            <div class="flex flex-col gap-4">
+                <div class="flex flex-col gap-2">
+                    <div class="flex justify-between items-center">
+                        <label for="bpm-slider" class="text-xs font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                            Tempo
+                        </label>
+                        <span id="bpm-display" class="text-xl font-semibold text-cyan-400">140</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input type="range" id="bpm-slider" min="60" max="180" value="140" step="1" 
+                            class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400 focus:outline-none">
+                        <input type="number" id="bpm-input" min="60" max="180" value="140" 
+                            class="w-16 bg-slate-900 border border-slate-700 rounded-lg text-center text-sm py-1 font-orbitron text-slate-200 focus:border-cyan-400 focus:outline-none">
+                    </div>
+                </div>
+
+                <!-- Quantization Bar Length Selector -->
+                <div class="flex items-center justify-between gap-2 bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+                    <span class="text-[11px] font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                        Loop length (beats):
+                    </span>
+                    <div class="flex gap-1">
+                        <button type="button" class="bar-len-btn px-3 py-2 rounded-md text-xs font-semibold transition-colors bg-slate-800 text-slate-300 hover:bg-slate-700" data-beats="4" aria-pressed="false">4</button>
+                        <button type="button" class="bar-len-btn px-3 py-2 rounded-md text-xs font-semibold transition-colors bg-slate-800 text-slate-300 hover:bg-slate-700" data-beats="8" aria-pressed="false">8</button>
+                        <button type="button" class="bar-len-btn px-3 py-2 rounded-md text-xs font-semibold transition-colors bg-slate-800 text-slate-300 hover:bg-slate-700" data-beats="16" aria-pressed="false">16</button>
+                        <button type="button" class="bar-len-btn px-3 py-2 rounded-md text-xs font-semibold transition-colors bg-cyan-500 text-slate-950" data-beats="24" aria-pressed="true">24</button>
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-xs text-slate-500 sm:text-right">Pads start and stop on the next loop.</p>
+            <p id="audio-error" class="hidden text-sm text-red-400 sm:col-span-2" role="status"></p>
+        </div>
+
+        <!-- LAUNCHPAD GRID -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+            
+            <!-- PAD 1 -->
+            <div class="pad-card flex flex-col justify-between gap-4" id="card-pad-0" data-color="cyan">
+                <div class="flex justify-between items-start gap-2">
+                    <div>
+                        <span class="text-[10px] font-orbitron tracking-widest uppercase text-cyan-400 font-bold">PAD 1</span>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-compact-disc text-cyan-400"></i> <span id="pad-name-0">BASE_1</span>
+                        </h2>
+                    </div>
+                    <span id="badge-status-0" class="pad-status">
+                        OFF
+                    </span>
+                </div>
+
+                <button id="btn-pad-0" class="pad-button" data-state="off">
+                    <i class="fa-solid fa-play text-2xl" id="icon-pad-0"></i>
+                    <span class="text-xs font-semibold tracking-wide" id="label-pad-0">TAP TO LOOP</span>
+                </button>
+
+                <div class="flex flex-col gap-2 z-10">
+                    <div class="flex gap-2">
+                        <select id="select-sound-0" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-400">
+                            <option value="sample" selected>BASE_1.wav</option>
+                            <option value="kick">Synth Kick</option>
+                            <option value="snare">Beat Snare / Clap</option>
+                            <option value="hihat">Hi-Hat Pattern</option>
+                            <option value="synth">Synth Bass Loop</option>
+                        </select>
+                        <label class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-300 cursor-pointer transition-colors flex items-center justify-center gap-1 min-w-max">
+                            <i class="fa-solid fa-upload"></i> Custom
+                            <input type="file" id="file-pad-0" accept="audio/*" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAD 2 -->
+            <div class="pad-card flex flex-col justify-between gap-4" id="card-pad-1" data-color="fuchsia">
+                <div class="flex justify-between items-start gap-2">
+                    <div>
+                        <span class="text-[10px] font-orbitron tracking-widest uppercase text-fuchsia-400 font-bold">PAD 2</span>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-compact-disc text-fuchsia-400"></i> <span id="pad-name-1">SYNTH_2</span>
+                        </h2>
+                    </div>
+                    <span id="badge-status-1" class="pad-status">
+                        OFF
+                    </span>
+                </div>
+
+                <button id="btn-pad-1" class="pad-button" data-state="off">
+                    <i class="fa-solid fa-play text-2xl" id="icon-pad-1"></i>
+                    <span class="text-xs font-semibold tracking-wide" id="label-pad-1">TAP TO LOOP</span>
+                </button>
+
+                <div class="flex flex-col gap-2 z-10">
+                    <div class="flex gap-2">
+                        <select id="select-sound-1" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-fuchsia-400">
+                            <option value="sample" selected>SYNTH_2.wav</option>
+                            <option value="kick">Synth Kick</option>
+                            <option value="snare">Beat Snare / Clap</option>
+                            <option value="hihat">Hi-Hat Pattern</option>
+                            <option value="synth">Synth Bass Loop</option>
+                        </select>
+                        <label class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-300 cursor-pointer transition-colors flex items-center justify-center gap-1 min-w-max">
+                            <i class="fa-solid fa-upload"></i> Custom
+                            <input type="file" id="file-pad-1" accept="audio/*" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAD 3 -->
+            <div class="pad-card flex flex-col justify-between gap-4" id="card-pad-2" data-color="yellow">
+                <div class="flex justify-between items-start gap-2">
+                    <div>
+                        <span class="text-[10px] font-orbitron tracking-widest uppercase text-yellow-400 font-bold">PAD 3</span>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-compact-disc text-yellow-400"></i> <span id="pad-name-2">SYNTH_3</span>
+                        </h2>
+                    </div>
+                    <span id="badge-status-2" class="pad-status">
+                        OFF
+                    </span>
+                </div>
+
+                <button id="btn-pad-2" class="pad-button" data-state="off">
+                    <i class="fa-solid fa-play text-2xl" id="icon-pad-2"></i>
+                    <span class="text-xs font-semibold tracking-wide" id="label-pad-2">TAP TO LOOP</span>
+                </button>
+
+                <div class="flex flex-col gap-2 z-10">
+                    <div class="flex gap-2">
+                        <select id="select-sound-2" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-yellow-400">
+                            <option value="sample" selected>SYNTH_3.wav</option>
+                            <option value="kick">Synth Kick</option>
+                            <option value="snare">Beat Snare / Clap</option>
+                            <option value="hihat">Hi-Hat Pattern</option>
+                            <option value="synth">Synth Bass Loop</option>
+                        </select>
+                        <label class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-300 cursor-pointer transition-colors flex items-center justify-center gap-1 min-w-max">
+                            <i class="fa-solid fa-upload"></i> Custom
+                            <input type="file" id="file-pad-2" accept="audio/*" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAD 4 -->
+            <div class="pad-card flex flex-col justify-between gap-4" id="card-pad-3" data-color="emerald">
+                <div class="flex justify-between items-start gap-2">
+                    <div>
+                        <span class="text-[10px] font-orbitron tracking-widest uppercase text-emerald-400 font-bold">PAD 4</span>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-compact-disc text-emerald-400"></i> <span id="pad-name-3">SYNTH_4</span>
+                        </h2>
+                    </div>
+                    <span id="badge-status-3" class="pad-status">
+                        OFF
+                    </span>
+                </div>
+
+                <button id="btn-pad-3" class="pad-button" data-state="off">
+                    <i class="fa-solid fa-play text-2xl" id="icon-pad-3"></i>
+                    <span class="text-xs font-semibold tracking-wide" id="label-pad-3">TAP TO LOOP</span>
+                </button>
+
+                <div class="flex flex-col gap-2 z-10">
+                    <div class="flex gap-2">
+                        <select id="select-sound-3" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-emerald-400">
+                            <option value="sample" selected>SYNTH_4.wav</option>
+                            <option value="kick">Synth Kick</option>
+                            <option value="snare">Beat Snare / Clap</option>
+                            <option value="hihat">Hi-Hat Pattern</option>
+                            <option value="synth">Synth Bass Loop</option>
+                        </select>
+                        <label class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-300 cursor-pointer transition-colors flex items-center justify-center gap-1 min-w-max">
+                            <i class="fa-solid fa-upload"></i> Custom
+                            <input type="file" id="file-pad-3" accept="audio/*" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAD 5 -->
+            <div class="pad-card flex flex-col justify-between gap-4" id="card-pad-4" data-color="cyan">
+                <div class="flex justify-between items-start gap-2">
+                    <div>
+                        <span class="text-[10px] font-orbitron tracking-widest uppercase text-cyan-400 font-bold">PAD 5</span>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-compact-disc text-cyan-400"></i> <span id="pad-name-4">SYNTH_5</span>
+                        </h2>
+                    </div>
+                    <span id="badge-status-4" class="pad-status">
+                        OFF
+                    </span>
+                </div>
+
+                <button id="btn-pad-4" class="pad-button" data-state="off">
+                    <i class="fa-solid fa-play text-2xl" id="icon-pad-4"></i>
+                    <span class="text-xs font-semibold tracking-wide" id="label-pad-4">TAP TO LOOP</span>
+                </button>
+
+                <div class="flex flex-col gap-2 z-10">
+                    <div class="flex gap-2">
+                        <select id="select-sound-4" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-400">
+                            <option value="sample" selected>SYNTH_5.wav</option>
+                            <option value="kick">Synth Kick</option>
+                            <option value="snare">Beat Snare / Clap</option>
+                            <option value="hihat">Hi-Hat Pattern</option>
+                            <option value="synth">Synth Bass Loop</option>
+                        </select>
+                        <label class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-300 cursor-pointer transition-colors flex items-center justify-center gap-1 min-w-max">
+                            <i class="fa-solid fa-upload"></i> Custom
+                            <input type="file" id="file-pad-4" accept="audio/*" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PAD 6 -->
+            <div class="pad-card flex flex-col justify-between gap-4" id="card-pad-5" data-color="fuchsia">
+                <div class="flex justify-between items-start gap-2">
+                    <div>
+                        <span class="text-[10px] font-orbitron tracking-widest uppercase text-fuchsia-400 font-bold">PAD 6</span>
+                        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+                            <i class="fa-solid fa-compact-disc text-fuchsia-400"></i> <span id="pad-name-5">SYNTH_7</span>
+                        </h2>
+                    </div>
+                    <span id="badge-status-5" class="pad-status">
+                        OFF
+                    </span>
+                </div>
+
+                <button id="btn-pad-5" class="pad-button" data-state="off">
+                    <i class="fa-solid fa-play text-2xl" id="icon-pad-5"></i>
+                    <span class="text-xs font-semibold tracking-wide" id="label-pad-5">TAP TO LOOP</span>
+                </button>
+
+                <div class="flex flex-col gap-2 z-10">
+                    <div class="flex gap-2">
+                        <select id="select-sound-5" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-fuchsia-400">
+                            <option value="sample" selected>SYNTH_7.wav</option>
+                            <option value="kick">Synth Kick</option>
+                            <option value="snare">Beat Snare / Clap</option>
+                            <option value="hihat">Hi-Hat Pattern</option>
+                            <option value="synth">Synth Bass Loop</option>
+                        </select>
+                        <label class="px-3 py-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-xl text-xs font-semibold text-slate-300 cursor-pointer transition-colors flex items-center justify-center gap-1 min-w-max">
+                            <i class="fa-solid fa-upload"></i> Custom
+                            <input type="file" id="file-pad-5" accept="audio/*" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- TONE.JS LOOPER SCRIPT -->
+    <script>
+        let isEngineRunning = false;
+        let bpm = 140;
+        let maxBeats = 24;
+        let engineStartPromise = null;
+
+        // Tone.js Instruments & Synths
+        let kickSynth, snareSynth, hihatSynth, melSynth;
+        
+        let syncEventId = null;
+        let beatEventId = null;
+        let currentBeat = 0;
+
+        // Pad Definitions
+        const pads = [
+            { id: 0, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_2/BASE_1.wav', player: null, colorClass: 'cyan' },
+            { id: 1, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_2/SYNTH_2.wav', player: null, colorClass: 'fuchsia' },
+            { id: 2, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_2/SYNTH_6.wav', player: null, colorClass: 'yellow' },
+            { id: 3, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_2/SYNTH_5.wav', player: null, colorClass: 'emerald' },
+            { id: 4, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_2/SYNTH_4.wav', player: null, colorClass: 'cyan' },
+            { id: 5, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_2/SYNTH_7.wav', player: null, colorClass: 'fuchsia' }
+        ];
+
+        // Initialize Tone Synths
+        function initToneInstruments() {
+            if (kickSynth) return;
+
+            kickSynth = new Tone.MembraneSynth({
+                pitchDecay: 0.05,
+                octaves: 8,
+                oscillator: { type: 'sine' },
+                envelope: { attack: 0.001, decay: 0.4, sustain: 0.01, release: 0.4 }
+            }).toDestination();
+
+            snareSynth = new Tone.NoiseSynth({
+                noise: { type: 'white' },
+                envelope: { attack: 0.001, decay: 0.2, sustain: 0 }
+            }).toDestination();
+
+            hihatSynth = new Tone.MetalSynth({
+                frequency: 200,
+                envelope: { attack: 0.001, decay: 0.05, release: 0.05 },
+                harmonicity: 5.1,
+                modulationIndex: 32,
+                resonance: 4000,
+                octaves: 1.5
+            }).toDestination();
+            hihatSynth.volume.value = -12;
+
+            melSynth = new Tone.MonoSynth({
+                oscillator: { type: 'sawtooth' },
+                filter: { Q: 3, type: 'lowpass', rollover: -24 },
+                envelope: { attack: 0.01, decay: 0.2, sustain: 0.2, release: 0.2 },
+                filterEnvelope: { attack: 0.01, decay: 0.2, sustain: 0.5, release: 0.2, baseFrequency: 200, octaves: 4 }
+            }).toDestination();
+            melSynth.volume.value = -6;
+        }
+
+        // Setup Beat Loop with Tone.Transport
+        function updateTransportLoop() {
+            const restartTransport = isEngineRunning;
+            if (restartTransport) {
+                Tone.Transport.stop();
+                Tone.Transport.position = '0:0:0';
+            }
+
+            Tone.Transport.bpm.value = bpm;
+            Tone.Transport.loop = true;
+            const loopDuration = maxBeats * 60 / bpm;
+            Tone.Transport.loopEnd = `${loopDuration}s`;
+            currentBeat = 0;
+            pads.forEach(pad => {
+                if (pad.player && pad.player.loaded) {
+                    pad.player.playbackRate = pad.player.buffer.duration / loopDuration;
+                }
+            });
+
+            if (syncEventId !== null) {
+                Tone.Transport.clear(syncEventId);
+            }
+            if (beatEventId !== null) {
+                Tone.Transport.clear(beatEventId);
+            }
+
+            syncEventId = Tone.Transport.scheduleRepeat((time) => {
+                currentBeat = 0;
+                pads.forEach(pad => {
+                    if (pad.state === 'PENDING_START') {
+                        pad.state = 'PLAYING';
+                        if (pad.player && pad.player.loaded) {
+                            pad.player.stop(time);
+                            pad.player.start(time);
+                        }
+                        Tone.Draw.schedule(() => updatePadUI(pad.id), time);
+                    } else if (pad.state === 'PENDING_STOP') {
+                        pad.state = 'OFF';
+                        if (pad.player) {
+                            pad.player.stop(time);
+                        }
+                        Tone.Draw.schedule(() => updatePadUI(pad.id), time);
+                    }
+                });
+            }, `${loopDuration}s`);
+
+            beatEventId = Tone.Transport.scheduleRepeat((time) => {
+                const beatIndex = currentBeat;
+                currentBeat = (currentBeat + 1) % maxBeats;
+                pads.forEach(pad => {
+                    if (pad.state === 'PLAYING' && !pad.player) {
+                        playPadSynthSound(pad.soundType, beatIndex, time);
+                    }
+                });
+            }, "4n");
+
+            if (restartTransport) {
+                const now = Tone.now();
+                pads.forEach(pad => {
+                    if (pad.state === 'PLAYING' && pad.player && pad.player.loaded) {
+                        pad.player.stop(now);
+                        pad.player.start(now);
+                    }
+                });
+                Tone.Transport.start();
+            }
+        }
+
+        // Synth Sound Sequences
+        function playPadSynthSound(type, beat, time) {
+            if (type === 'kick') {
+                if (beat % 2 === 0 || beat === maxBeats - 1) {
+                    kickSynth.triggerAttackRelease(beat === maxBeats - 1 ? 'C2' : 'C1', '8n', time);
+                }
+            } else if (type === 'snare') {
+                if (beat % 2 === 1) {
+                    snareSynth.triggerAttackRelease('8n', time);
+                }
+            } else if (type === 'hihat') {
+                hihatSynth.triggerAttackRelease('16n', time);
+            } else if (type === 'synth') {
+                const notes = ['C2', 'Eb2', 'F2', 'G2', 'Bb2', 'C3', 'G2', 'Eb2'];
+                const note = notes[beat % notes.length];
+                melSynth.triggerAttackRelease(note, '8n', time);
+            }
+        }
+
+        async function loadPadSample(pad) {
+            if (pad.player && pad.player.loaded) return;
+            if (pad.playerLoadPromise) return pad.playerLoadPromise;
+
+            const player = new Tone.Player({
+                url: new URL(pad.samplePath, document.baseURI).href,
+                loop: true,
+                autostart: false
+            }).toDestination();
+            pad.player = player;
+            pad.playerLoadPromise = Tone.loaded()
+                .then(() => {
+                    if (!player.loaded) throw new Error(`Audio file did not load: ${pad.samplePath}`);
+                    if (isEngineRunning) updateTransportLoop();
+                })
+                .catch(error => {
+                    player.dispose();
+                    if (pad.player === player) pad.player = null;
+                    throw new Error(`Could not load ${pad.samplePath}: ${error.message}`);
+                })
+                .finally(() => {
+                    pad.playerLoadPromise = null;
+                });
+            return pad.playerLoadPromise;
+        }
+
+        // Engine Control
+        async function startEngine() {
+            if (isEngineRunning) return true;
+            if (engineStartPromise) return engineStartPromise;
+
+            engineStartPromise = (async () => {
+                try {
+                    await Tone.start();
+                    initToneInstruments();
+                    await Promise.all(pads
+                        .filter(pad => pad.soundType === 'sample')
+                        .map(loadPadSample));
+
+                    const errorStatus = document.getElementById('audio-error');
+                    errorStatus.classList.add('hidden');
+                    errorStatus.innerText = '';
+                    updateTransportLoop();
+                    Tone.Transport.start();
+                    isEngineRunning = true;
+
+                    const masterBtn = document.getElementById('btn-master-start');
+                    masterBtn.innerHTML = `<i class="fa-solid fa-stop mr-1"></i> Stop engine`;
+                    return true;
+                } catch (error) {
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    const errorStatus = document.getElementById('audio-error');
+                    errorStatus.innerText = `${errorMessage} If opened directly as a file, try a local web server.`;
+                    errorStatus.classList.remove('hidden');
+                    console.error('Unable to start looper:', error);
+                    return false;
+                } finally {
+                    engineStartPromise = null;
+                }
+            })();
+            return engineStartPromise;
+        }
+
+        function stopEngine() {
+            if (isEngineRunning) {
+                Tone.Transport.stop();
+                isEngineRunning = false;
+
+                pads.forEach(p => {
+                    p.state = 'OFF';
+                    if (p.player) p.player.stop();
+                    updatePadUI(p.id);
+                });
+
+                const masterBtn = document.getElementById('btn-master-start');
+                masterBtn.innerHTML = `<i class="fa-solid fa-play mr-1"></i> Start`;
+            }
+        }
+
+        async function togglePadState(padId) {
+            if (!await startEngine()) return;
+            const pad = pads[padId];
+
+            if (pad.state === 'OFF') {
+                pad.state = 'PENDING_START';
+            } else if (pad.state === 'PENDING_START') {
+                pad.state = 'OFF';
+            } else if (pad.state === 'PLAYING') {
+                pad.state = 'PENDING_STOP';
+            } else if (pad.state === 'PENDING_STOP') {
+                pad.state = 'PLAYING';
+            }
+
+            updatePadUI(padId);
+        }
+
+        function updatePadUI(padId) {
+            const pad = pads[padId];
+            const btn = document.getElementById(`btn-pad-${padId}`);
+            const badge = document.getElementById(`badge-status-${padId}`);
+            const icon = document.getElementById(`icon-pad-${padId}`);
+            const label = document.getElementById(`label-pad-${padId}`);
+            const card = document.getElementById(`card-pad-${padId}`);
+
+            const stateUI = {
+                OFF: { badge: 'OFF', icon: 'fa-play', label: 'TAP TO LOOP' },
+                PENDING_START: { badge: 'STARTING', icon: 'fa-hourglass-half', label: 'START ON NEXT LOOP' },
+                PLAYING: { badge: 'PLAYING', icon: 'fa-volume-high', label: 'LOOP ACTIVE' },
+                PENDING_STOP: { badge: 'STOPPING', icon: 'fa-pause', label: 'STOP ON NEXT LOOP' }
+            };
+            const state = stateUI[pad.state];
+            card.dataset.color = pad.colorClass;
+            btn.dataset.state = pad.state.toLowerCase();
+            badge.innerText = state.badge;
+            icon.className = `fa-solid ${state.icon} text-2xl`;
+            label.innerText = state.label;
+        }
+
+        // Custom Sound File Loader for Tone.Player
+        function handleFileUpload(padId, file) {
+            if (!file) return;
+
+            const url = URL.createObjectURL(file);
+            const pad = pads[padId];
+
+            if (pad.player) {
+                pad.player.dispose();
+            }
+
+            pad.player = new Tone.Player({
+                url: url,
+                loop: true,
+                autostart: false
+            }).toDestination();
+
+            Tone.loaded().then(() => {
+                const padNameElement = document.getElementById(`pad-name-${padId}`);
+                padNameElement.innerText = file.name.length > 18 ? file.name.substring(0, 15) + '...' : file.name;
+                padNameElement.classList.add('text-cyan-300');
+            });
+        }
+
+        // Setup Event Listeners
+        window.addEventListener('DOMContentLoaded', () => {
+            document.querySelectorAll('.bar-len-btn').forEach(btn => {
+                btn.addEventListener('click', (event) => {
+                    const selectedButton = event.currentTarget;
+                    const newBeats = Number.parseInt(selectedButton.dataset.beats, 10);
+                    if (![4, 8, 16, 24].includes(newBeats)) return;
+                    if (newBeats === maxBeats) return;
+
+                    maxBeats = newBeats;
+
+                    document.querySelectorAll('.bar-len-btn').forEach(b => {
+                        b.className = "bar-len-btn px-3 py-2 rounded-md text-xs font-semibold transition-colors bg-slate-800 text-slate-300 hover:bg-slate-700";
+                        b.setAttribute('aria-pressed', 'false');
+                    });
+                    selectedButton.className = "bar-len-btn px-3 py-2 rounded-md text-xs font-semibold transition-colors bg-cyan-500 text-slate-950";
+                    selectedButton.setAttribute('aria-pressed', 'true');
+                    pads.forEach(pad => updatePadUI(pad.id));
+
+                    updateTransportLoop();
+                });
+            });
+
+            document.getElementById('btn-master-start').addEventListener('click', () => {
+                if (!isEngineRunning) {
+                    startEngine();
+                } else {
+                    stopEngine();
+                }
+            });
+
+            document.getElementById('btn-stop-all').addEventListener('click', () => {
+                pads.forEach(p => {
+                    p.state = 'OFF';
+                    if (p.player) p.player.stop();
+                    updatePadUI(p.id);
+                });
+            });
+
+            const bpmSlider = document.getElementById('bpm-slider');
+            const bpmInput = document.getElementById('bpm-input');
+            const bpmDisplay = document.getElementById('bpm-display');
+
+            function setBpm(val) {
+                bpm = Math.min(Math.max(parseInt(val) || 140, 60), 180);
+                bpmSlider.value = bpm;
+                bpmInput.value = bpm;
+                bpmDisplay.innerText = bpm;
+                if (isEngineRunning) {
+                    updateTransportLoop();
+                }
+            }
+
+            bpmSlider.addEventListener('input', (e) => setBpm(e.target.value));
+            bpmInput.addEventListener('change', (e) => setBpm(e.target.value));
+
+            pads.forEach(pad => {
+                const padId = pad.id;
+
+                document.getElementById(`btn-pad-${padId}`).addEventListener('click', async () => {
+                    await togglePadState(padId);
+                });
+
+                document.getElementById(`select-sound-${padId}`).addEventListener('change', (e) => {
+                    if (pad.player) {
+                        pad.player.stop();
+                        pad.player.dispose();
+                        pad.player = null;
+                    }
+                    pad.soundType = e.target.value;
+
+                    const names = {
+                        sample: pad.samplePath.split('/').pop().replace('.wav', ''),
+                        kick: 'Kick Electro Loop',
+                        snare: 'Snare & Clap Beat',
+                        hihat: 'Hi-Hat Groove',
+                        synth: 'Synth Bass Line'
+                    };
+                    document.getElementById(`pad-name-${padId}`).innerText = names[e.target.value] || 'Custom Sound';
+                    if (pad.soundType === 'sample' && isEngineRunning) {
+                        loadPadSample(pad).catch(error => {
+                            const errorStatus = document.getElementById('audio-error');
+                            errorStatus.innerText = error.message;
+                            errorStatus.classList.remove('hidden');
+                            console.error('Unable to load pad sample:', error);
+                        });
+                    }
+                });
+
+                document.getElementById(`file-pad-${padId}`).addEventListener('change', (e) => {
+                    if (e.target.files.length > 0) {
+                        handleFileUpload(padId, e.target.files[0]);
+                        const player = pad.player;
+                        Tone.loaded().then(() => {
+                            if (pad.player === player && isEngineRunning) updateTransportLoop();
+                        }).catch(error => {
+                            const errorStatus = document.getElementById('audio-error');
+                            errorStatus.innerText = `Could not load custom audio: ${error.message}`;
+                            errorStatus.classList.remove('hidden');
+                            console.error('Unable to load custom audio:', error);
+                        });
+                    }
+                });
+            });
+        });
+    </script>
+    <script>
+        const ablyClient = new Ably.Realtime({
+            key: "xO6zTg.qhdvvA:VBoolt4nyrt_7TIdvV9stu_2dQ4SirK-bgkR4Buys-0",
+            clientId: `looper-${Date.now()}-${Math.random().toString(36).slice(2)}`
+        });
+        const receiverAudioChannel = ablyClient.channels.get('receiver-audio');
+
+        receiverAudioChannel.subscribe('loading-complete', message => {
+            const receiverId = message.data?.receiverId;
+            if (typeof receiverId !== 'string') return;
+
+            receiverAudioChannel.publish('play-sfx', {
+                receiverId,
+                sound: 'loaded'
+            }).catch(error => {
+                console.error('Failed to send loading completion sound to receiver:', error);
+            });
+        });
+    </script>
+</body>
+</html>
