@@ -132,9 +132,10 @@
                 </div>
             </div>
 
-            <p class="text-xs text-slate-500 sm:text-right">Connect the Launchpad here to enable hardware input and unlock audio. Sounds start on the next loop boundary; open sender1 and connect its MIDI output for physical light animations.</p>
+            <p class="text-xs text-slate-500 sm:text-right">Connect the Launchpad here to enable hardware input. Sounds start on the next loop boundary; open sender1 for physical light animations, or select a key under PAD 1 and open sender2 to trigger it. Click Start once to unlock audio for keyboard triggers.</p>
             <p id="midi-status" class="text-xs text-slate-500 sm:col-span-2" role="status" aria-live="polite">Launchpad not connected.</p>
             <p id="looper-link-status" class="text-xs text-slate-500 sm:col-span-2" role="status">Waiting for sender1…</p>
+            <p id="keyboard-link-status" class="text-xs text-slate-500 sm:col-span-2" role="status" aria-live="polite">Waiting for sender2 keyboard input. Select a key under PAD 1.</p>
             <p id="audio-error" class="hidden text-sm text-red-400 sm:col-span-2" role="status"></p>
         </div>
 
@@ -180,6 +181,13 @@
                             <option value="">Not mapped</option>
                         </select>
                     </label>
+                    <label class="flex items-center gap-2 text-xs text-slate-400" for="select-keyboard-0">
+                        Keyboard key
+                        <select id="select-keyboard-0" class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300">
+                            <option value="">Not mapped</option>
+                        </select>
+                    </label>
+                    <p class="text-[11px] text-slate-500">Stop PAD 1: MIDI 65</p>
                 </div>
             </div>
 
@@ -375,6 +383,20 @@
             { id: 4, state: 'OFF', soundType: 'sample', samplePath: '../SFX/MIDI_3/KICK_2_RICCARDO.wav', player: null, colorClass: 'cyan' }
         ];
         const LAUNCHPAD_MAPPING_STORAGE_KEY = 'looper-launchpad-mappings-v2';
+        const KEYBOARD_MAPPING_STORAGE_KEY = 'looper-keyboard-mapping-v1';
+        const DEFAULT_KEYBOARD_NOTE_MAPPING = 36;
+        const KEYBOARD_STOP_NOTE = 65;
+        const KEYBOARD_NOTE_OPTIONS = [
+            { key: 'A', note: 36 },
+            { key: 'S', note: 40 },
+            { key: 'D', note: 43 },
+            { key: 'F', note: 47 },
+            { key: 'G', note: 50 },
+            { key: 'H', note: 53 },
+            { key: 'J', note: 57 },
+            { key: 'K', note: 60 },
+            { key: 'L', note: 64 }
+        ];
         const launchpadButtonIds = [
             ...Array.from({ length: 8 }, (_, row) =>
                 Array.from({ length: 8 }, (_, column) => (8 - row) * 10 + column + 1)
@@ -391,6 +413,7 @@
         let midiConnectionEnabled = false;
         const DEFAULT_LAUNCHPAD_MAPPINGS = [11, 12, 13, 14, 15];
         let launchpadMappings = [...DEFAULT_LAUNCHPAD_MAPPINGS];
+        let keyboardNoteMapping = DEFAULT_KEYBOARD_NOTE_MAPPING;
 
         function loadLaunchpadMappings() {
             try {
@@ -467,6 +490,21 @@
                 return;
             }
             void handleLaunchpadInput(looperMidiSenderId, id, isDown);
+        }
+
+        function handleKeyboardMessage(message) {
+            const data = message.data;
+            if (!data || data.type !== 'noteon' || !Number.isInteger(data.note)) return;
+
+            document.getElementById('keyboard-link-status').textContent =
+                'Receiving keyboard input from sender2.';
+            if (data.note === KEYBOARD_STOP_NOTE) {
+                stopPad(0);
+            } else if (keyboardNoteMapping !== null && data.note === keyboardNoteMapping) {
+                void startPad(0).catch(error => {
+                    console.error('Could not start PAD 1 from keyboard input:', error);
+                });
+            }
         }
 
         function updateMidiPorts() {
@@ -765,6 +803,31 @@
             updatePadUI(padId);
         }
 
+        async function startPad(padId) {
+            if (!await startEngine()) return;
+            const pad = pads[padId];
+            if (pad.state === 'OFF') {
+                pad.state = 'PENDING_START';
+            } else if (pad.state === 'PENDING_STOP') {
+                pad.state = 'PLAYING';
+            } else {
+                return;
+            }
+            updatePadUI(padId);
+        }
+
+        function stopPad(padId) {
+            const pad = pads[padId];
+            if (pad.state === 'PENDING_START') {
+                pad.state = 'OFF';
+            } else if (pad.state === 'PLAYING') {
+                pad.state = 'PENDING_STOP';
+            } else {
+                return;
+            }
+            updatePadUI(padId);
+        }
+
         function updatePadUI(padId) {
             const pad = pads[padId];
             const btn = document.getElementById(`btn-pad-${padId}`);
@@ -816,6 +879,47 @@
         window.addEventListener('DOMContentLoaded', () => {
             document.getElementById('btn-connect-launchpad').addEventListener('click', connectLaunchpad);
             launchpadMappings = loadLaunchpadMappings();
+            const keyboardMappingSelect = document.getElementById('select-keyboard-0');
+            KEYBOARD_NOTE_OPTIONS.forEach(({ key, note }) => {
+                keyboardMappingSelect.add(new Option(`${key} (MIDI ${note})`, String(note)));
+            });
+            try {
+                const savedKeyboardNote = localStorage.getItem(KEYBOARD_MAPPING_STORAGE_KEY);
+                if (savedKeyboardNote === 'none') {
+                    keyboardNoteMapping = null;
+                } else if (savedKeyboardNote !== null) {
+                    const parsedNote = Number(savedKeyboardNote);
+                    keyboardNoteMapping = KEYBOARD_NOTE_OPTIONS.some(
+                        option => option.note === parsedNote
+                    ) ? parsedNote : DEFAULT_KEYBOARD_NOTE_MAPPING;
+                }
+            } catch (error) {
+                console.error('Could not load keyboard key mapping:', error);
+                document.getElementById('keyboard-link-status').textContent =
+                    `Could not load keyboard key mapping: ${error.message}`;
+            }
+            keyboardMappingSelect.value = keyboardNoteMapping === null
+                ? ''
+                : String(keyboardNoteMapping);
+            keyboardMappingSelect.addEventListener('change', event => {
+                keyboardNoteMapping = event.target.value === ''
+                    ? null
+                    : Number(event.target.value);
+                try {
+                    if (keyboardNoteMapping === null) {
+                        localStorage.setItem(KEYBOARD_MAPPING_STORAGE_KEY, 'none');
+                    } else {
+                        localStorage.setItem(
+                            KEYBOARD_MAPPING_STORAGE_KEY,
+                            String(keyboardNoteMapping)
+                        );
+                    }
+                } catch (error) {
+                    console.error('Could not save keyboard key mapping:', error);
+                    document.getElementById('keyboard-link-status').textContent =
+                        `Could not save keyboard key mapping: ${error.message}`;
+                }
+            });
             if (!looperChannel) {
                 document.getElementById('looper-link-status').textContent =
                     'Cross-page control requires BroadcastChannel support in this browser.';
@@ -958,6 +1062,8 @@
             clientId: `looper-${Date.now()}-${Math.random().toString(36).slice(2)}`
         });
         const receiverAudioChannel = ablyClient.channels.get('receiver-audio');
+        const keyboardChannel = ablyClient.channels.get('keyboard');
+        keyboardChannel.subscribe('midi', handleKeyboardMessage);
 
         receiverAudioChannel.subscribe('loading-complete', message => {
             const receiverId = message.data?.receiverId;
